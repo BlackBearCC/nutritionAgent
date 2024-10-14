@@ -55,16 +55,17 @@ class BaseAgentModule(ABC):
             prompt_template = input_data.get('prompt_template')
             invoke_input = input_data.get('invoke_input', {})
             kwargs = input_data.get('kwargs', {})
+            batch_name = input_data.get('batch_name', 'unnamed_batch')  # 新增：获取批次名称
             task = asyncio.create_task(self.async_call_llm(prompt_template, invoke_input, **kwargs))
-            tasks.append(task)
+            tasks.append((batch_name, task))  # 将批次名称与任务一起存储
         
-        results = []
-        for task in asyncio.as_completed(tasks):
+        results = {}
+        for batch_name, task in tasks:
             try:
                 result = await task
-                results.append(result)
+                results[batch_name] = result  # 使用批次名称作为键存储结果
             except Exception as e:
                 logging.error(f"批处理中出现错误：{e}")
-                results.append(None)
+                results[batch_name] = None  # 错误时也使用批次名称存储 None
         
         return results
