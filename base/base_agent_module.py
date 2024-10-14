@@ -13,8 +13,9 @@ class BaseAgentModule(ABC):
     """
     def __init__(self):
         self.llm_api_key = os.getenv('DASHSCOPE_API_KEY')
+        self.logger = logging.getLogger(self.__class__.__name__)
     @abstractmethod
-    async def process(self, input_data):
+    async def process(self, input_data: dict):
         pass
     
     async def async_call_llm(self, prompt_template, invoke_input: dict, **kwargs):
@@ -35,6 +36,7 @@ class BaseAgentModule(ABC):
             logging.error(f"Unexpected error occurred: {e}")
             raise e
         
+    ## 避免input之外占位符被替换，简易langchain特性处理    
     def generate_prompt_text(self, prompt_template, **kwargs):
         for key, value in kwargs.items():
             prompt_template = prompt_template.replace(f'{{{key}}}', str(value))
@@ -51,21 +53,30 @@ class BaseAgentModule(ABC):
 
     async def batch_async_call_llm(self, batch_inputs: list):
         tasks = []
-        for input_data in batch_inputs:
+        total_tasks = len(batch_inputs)
+        
+        for index, input_data in enumerate(batch_inputs, start=1):
             prompt_template = input_data.get('prompt_template')
             invoke_input = input_data.get('invoke_input', {})
             kwargs = input_data.get('kwargs', {})
-            batch_name = input_data.get('batch_name', 'unnamed_batch')  # 新增：获取批次名称
-            task = asyncio.create_task(self.async_call_llm(prompt_template, invoke_input, **kwargs))
-            tasks.append((batch_name, task))  # 将批次名称与任务一起存储
+            batch_name = input_data.get('batch_name', f'unnamed_batch_{index}')
+            
+            self.logger.info(f"创建任务: {batch_name} ({index}/{total_tasks})")
+            task = asyncio.create_task(self._process_single_task(batch_name, prompt_template, invoke_input, kwargs, index, total_tasks))
+            tasks.append(task)
+
+        self.logger.info(f"开始并发处理 {total_tasks} 个任务")
+        results = await asyncio.gather(*tasks)
+        self.logger.info(f"批处理完成，共处理 {total_tasks} 个任务")
         
-        results = {}
-        for batch_name, task in tasks:
-            try:
-                result = await task
-                results[batch_name] = result  # 使用批次名称作为键存储结果
-            except Exception as e:
-                logging.error(f"批处理中出现错误：{e}")
-                results[batch_name] = None  # 错误时也使用批次名称存储 None
-        
-        return results
+        return dict(results)
+
+    async def _process_single_task(self, batch_name, prompt_template, invoke_input, kwargs, index, total_tasks):
+        self.logger.info(f"处理中: {batch_name} ({index}/{total_tasks})")
+        try:
+            result = await self.async_call_llm(prompt_template, invoke_input, **kwargs)
+            self.logger.info(f"完成: {batch_name} ({index}/{total_tasks})")
+            return batch_name, result
+        except Exception as e:
+            self.logger.error(f"批处理中出现错误 ({batch_name}): {e}")
+            return batch_name, None
