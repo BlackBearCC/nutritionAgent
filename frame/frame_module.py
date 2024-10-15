@@ -9,26 +9,54 @@ class FrameModule(BaseAgentModule):
         analysis_result = input_data.get('analysis_result')
         user_info = input_data.get('user_info')
         
-        logging.info("开始生成7天食谱框架")
+        logging.info("开始生成食材和分组")
         
-        weekly_meal_plan_template = frame_prompt.weekly_meal_plan_prompt
-        weekly_meal_plan_input = {
-            "input_text": str(analysis_result)
+        # 第一步：生成食材并分组
+        ingredient_generation_template = frame_prompt.ingredient_generation_prompt
+        ingredient_input = {
+            "analysis_result": json.dumps(analysis_result),
+            "user_info": user_info,
+            "food_database": self.get_food_database()
         }
-        weekly_meal_plan_result = await self.async_call_llm(
-            weekly_meal_plan_template, 
-            weekly_meal_plan_input,
-            user_info=user_info,
-            food_database=str(self.get_food_database())
-        )
+        ingredient_result = await self.async_call_llm(ingredient_generation_template, ingredient_input)
         
         try:
-            weekly_meal_plan_json = json.loads(weekly_meal_plan_result)
-            logging.info("成功生成7天食谱框架")
-            return weekly_meal_plan_json
+            ingredient_groups = json.loads(ingredient_result)
+            logging.info("成功生成食材分组")
         except json.JSONDecodeError:
-            logging.error("生成的7天食谱框架不是有效的JSON格式")
+            logging.error("生成的食材分组不是有效的JSON格式")
             return None
+        
+        logging.info("开始生成7天食谱框架")
+        
+        # 第二步：使用批处理能力生成7天食谱框架
+        daily_meal_plan_template = frame_prompt.daily_meal_plan_prompt
+        batch_inputs = []
+        
+        for day, ingredients in ingredient_groups.items():
+            batch_inputs.append({
+                'batch_name': day,
+                'prompt_template': daily_meal_plan_template,
+                'invoke_input': {
+                    "analysis_result": json.dumps(analysis_result),
+                    "user_info": user_info,
+                    "day_ingredients": json.dumps(ingredients),
+                    "day": day
+                }
+            })
+        
+        results = await self.batch_async_call_llm(batch_inputs)
+        
+        weekly_meal_plan = {}
+        for day, result in results.items():
+            try:
+                daily_plan = json.loads(result)
+                weekly_meal_plan[day] = daily_plan
+            except json.JSONDecodeError:
+                logging.error(f"{day} 的食谱框架不是有效的JSON格式")
+        
+        logging.info("成功生成7天食谱框架")
+        return weekly_meal_plan
 
     def get_food_database(self):
         return ["鸡胸肉", "牛肉", "猪五花", "羊肉", "鸭肉", "鹅肉", "兔肉", "鱼肉", "虾", "蟹肉",

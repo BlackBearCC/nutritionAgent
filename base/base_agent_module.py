@@ -18,8 +18,8 @@ class BaseAgentModule(ABC):
     async def process(self, input_data: dict):
         pass
     
-    async def async_call_llm(self, prompt_template, invoke_input: dict, **kwargs):
-        llm = Tongyi(model_name="qwen-turbo", temperature=0.7, top_k=100, top_p=0.9, dashscope_api_key=self.llm_api_key)
+    async def async_call_llm(self, prompt_template, invoke_input: dict,llm_name="qwen-turbo", **kwargs):
+        llm = Tongyi(model_name=llm_name, temperature=0.7, top_k=100, top_p=0.9, dashscope_api_key=self.llm_api_key)
         prompt_text = self.generate_prompt_text(prompt_template, **kwargs)
         prompt = PromptTemplate(template=prompt_text, input_variables=invoke_input.keys())
         output_parser = StrOutputParser()

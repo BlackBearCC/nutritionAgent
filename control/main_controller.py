@@ -32,15 +32,25 @@ async def main():
         'user_info': user_info
     })
     logging.info("食谱框架生成完成")
-    
-    logging.info("开始生成具体食谱")
-    generation_module = GenerationModule()
-    weekly_recipes = await generation_module.process(frame_result)
-    logging.info("具体食谱生成完成")
+    # logging.info("开始生成7天食谱")
+    # generation_module = GenerationModule()
+    # weekly_recipes = await generation_module.process({
+    #     'analysis_result': analysis_result,
+    #     'user_info': user_info
+    # })
+    # logging.info("7天食谱生成完成")
     
     print("分析结果:", json.dumps(analysis_result, ensure_ascii=False, indent=2))
-    print("食谱框架结果:", json.dumps(frame_result, ensure_ascii=False, indent=2))
-    print("每周食谱:", json.dumps(weekly_recipes, ensure_ascii=False, indent=2))
+
+    
+    # logging.info("开始生成具体食谱")
+    # generation_module = GenerationModule()
+    # weekly_recipes = await generation_module.process(frame_result)
+    # logging.info("具体食谱生成完成")
+    
+    # print("分析结果:", json.dumps(analysis_result, ensure_ascii=False, indent=2))
+    # print("食谱框架结果:", json.dumps(frame_result, ensure_ascii=False, indent=2))
+    # print("每周食谱:", json.dumps(weekly_recipes, ensure_ascii=False, indent=2))
 
 # 运行异步主函数
 asyncio.run(main())
