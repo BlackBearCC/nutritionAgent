@@ -18,7 +18,7 @@ weekly_meal_evaluation_prompt = """
 5. 热量控制：总热量是否合适，分配是否合理。
 6. 实用性：食谱是否易于实施，符合日常生活。
 
-请提供一个总体评估，指出任何潜在的问题或改进建议。如果发现严重问题，请具体指出哪天(编号）、哪一餐需要调整，并给出调整建议。
+请提供一个总体评估，指出任何潜在的问题或改进建议。如果发现严重问题，请具体指出哪天、哪一餐需要调整，并给出调整建议。
 
 输出格式：
 {{
@@ -26,8 +26,8 @@ weekly_meal_evaluation_prompt = """
   "general_comments": "总体评价和综合建议",
   "improvement_suggestions": [
     {{
-      "day": "第几天(编号：1.2..7)",
-      "meal": "哪一餐（英文字段）",
+      "day": "第几天(编号1.2...7)",
+      "meal": "breakfast/lunch/dinner",
       "issue": "问题描述",
       "suggestion": "改进建议"
     }},
@@ -35,7 +35,7 @@ weekly_meal_evaluation_prompt = """
   ]
 }}
 
-##请确保JSON格式正确并只返回{{}}内的正文内容，不要添加任何额外的文本或解释。
+##请确保JSON格式正确并只返回{{}}内的正文内容，禁止在day或meal中使用复数或汉字，只允许输入单个编号，不要添加任何额外的文本或解释。
 """
 
 follow_up_evaluation_prompt = """
@@ -64,8 +64,8 @@ follow_up_evaluation_prompt = """
   "general_comments": "总体评价和综合建议",
   "improvement_suggestions": [
     {{
-      "day": "第几天(编号：1.2..7)",
-      "meal": "哪一餐",
+      "day": "第几天(1-7)",
+      "meal": "breakfast/lunch/dinner",
       "issue": "问题描述",
       "suggestion": "改进建议"
     }},

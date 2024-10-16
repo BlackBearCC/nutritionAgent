@@ -9,7 +9,7 @@ class FrameModule(BaseAgentModule):
         analysis_result = input_data.get('analysis_result')
         user_info = input_data.get('user_info')
         specific_meal = input_data.get('specific_meal')
-        weekly_meal_plan = input_data.get('weekly_meal_plan')
+        weekly_meal_plan = input_data.get('weekly_meal_plan', {})
         
         if specific_meal:
             return await self.regenerate_specific_meal(analysis_result, user_info, specific_meal, weekly_meal_plan)
@@ -32,54 +32,58 @@ class FrameModule(BaseAgentModule):
             logging.error("生成的食材分组不是有效的JSON格式")
             return None
         
-        logging.info("开始生成7天食谱框架")
+        logging.info("开始生成7天21餐食谱框架")
         
-        # 第二步：使用批处理能力生成7天食谱框架
-        daily_meal_plan_template = frame_prompt.daily_meal_plan_prompt
+        # 第二步：使用批处理能力生成7天21餐食谱框架
+        meal_plan_template = frame_prompt.meal_plan_prompt
         batch_inputs = []
         
-        for i, (day, ingredients) in enumerate(ingredient_groups.items(), start=1):
-            batch_inputs.append({
-                'batch_name': str(i),
-                'prompt_template': daily_meal_plan_template,
-                'invoke_input': {
-                    "analysis_result": json.dumps(analysis_result),
-                    "user_info": user_info,
-                    "day_ingredients": json.dumps(ingredients),
-                    "day": str(i)
-                }
-            })
+        for day in range(1, 8):
+            for meal in ['breakfast', 'lunch', 'dinner']:
+                batch_inputs.append({
+                    'batch_name': f"{day}_{meal}",
+                    'prompt_template': meal_plan_template,
+                    'invoke_input': {
+                        "analysis_result": json.dumps(analysis_result),
+                        "user_info": user_info,
+                        "day_ingredients": json.dumps(ingredient_groups.get(str(day), [])),
+                        "day": str(day),
+                        "meal": meal
+                    }
+                })
         
         results = await self.batch_async_call_llm(batch_inputs)
         
-        weekly_meal_plan = {}
-        for day, result in results.items():
+        for batch_name, result in results.items():
             try:
-                daily_plan = json.loads(result)
-                weekly_meal_plan[day] = daily_plan
+                meal_plan = json.loads(result)
+                weekly_meal_plan[meal_plan['day']] = weekly_meal_plan.get(meal_plan['day'], {})
+                weekly_meal_plan[meal_plan['day']][meal_plan['meal']] = meal_plan['menu']
             except json.JSONDecodeError:
-                logging.error(f"第 {day} 天的食谱框架不是有效的JSON格式")
+                logging.error(f"{batch_name} 的食谱框架不是有效的JSON格式")
         
-        logging.info("成功生成7天食谱框架")
+        logging.info("成功生成7天21餐食谱框架")
         return weekly_meal_plan
 
     async def regenerate_specific_meal(self, analysis_result, user_info, specific_meal, weekly_meal_plan):
         day, meal = specific_meal['day'], specific_meal['meal']
         ingredients = self.get_ingredients_for_day(weekly_meal_plan, day)
         
-        daily_meal_plan_template = frame_prompt.daily_meal_plan_prompt
+        meal_plan_template = frame_prompt.meal_plan_prompt
         invoke_input = {
             "analysis_result": json.dumps(analysis_result),
             "user_info": user_info,
             "day_ingredients": json.dumps(ingredients),
-            "day": day
+            "day": day,
+            "meal": meal
         }
         
-        new_daily_plan = await self.async_call_llm(daily_meal_plan_template, invoke_input)
+        new_meal_plan = await self.async_call_llm(meal_plan_template, invoke_input)
         
         try:
-            new_daily_plan = json.loads(new_daily_plan)
-            weekly_meal_plan[day][meal] = new_daily_plan[meal]
+            new_meal_plan = json.loads(new_meal_plan)
+            weekly_meal_plan[day] = weekly_meal_plan.get(day, {})
+            weekly_meal_plan[day][meal] = new_meal_plan['menu']
             logging.info(f"成功重新生成第 {day} 天的 {meal}")
             return weekly_meal_plan
         except json.JSONDecodeError:
@@ -94,12 +98,11 @@ class FrameModule(BaseAgentModule):
         return "无"
 
     def get_ingredients_for_day(self, weekly_meal_plan, day):
-        # 从weekly_meal_plan中提取指定日期的所有食材
         all_ingredients = set()
         if day in weekly_meal_plan:
             for meal in weekly_meal_plan[day].values():
                 for dish in meal.get('dishes', []):
                     all_ingredients.update(dish.get('ingredients', []))
-        else:
-            logging.warning(f"第 {day} 天的食谱不存在")
+        if not all_ingredients:
+            logging.warning(f"第 {day} 天的食谱不存在或没有食材")
         return list(all_ingredients)

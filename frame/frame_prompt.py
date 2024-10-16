@@ -27,8 +27,8 @@ ingredient_generation_prompt = """
 请确保JSON格式正确并只返回{{}}内的正文内容，不要添加任何额外的文本或解释。
 """
 
-daily_meal_plan_prompt = """
-作为一位经验丰富的中国营养师，请根据以下信息为用户制定第{day}天的详细膳食计划，确保符合中国人的饮食习惯：
+meal_plan_prompt = """
+作为一位经验丰富的中国营养师，请根据以下信息为用户制定第{day}天的{meal}膳食计划，确保符合中国人的饮食习惯：
 
 分析结果：
 {analysis_result}
@@ -40,7 +40,7 @@ daily_meal_plan_prompt = """
 {day_ingredients}
 
 请遵循以下步骤：
-1. 根据分析结果和用户信息，平衡食材和烹饪方式的热量，为早餐、午餐和晚餐设计适当的膳食。
+1. 根据分析结果和用户信息，平衡食材和烹饪方式的热量，为指定的膳食设计适当的菜品。
 2. 以当天提供的食材为主食材制作菜品，可自行添加辅助食材，确保每餐符合中国居民的传统饮食习惯：
    - 早餐：以清淡为主，可包括粥、包子、馒头、鸡蛋、豆浆牛奶等早餐。
    - 午餐和晚餐：以中式菜肴为主，通常包括主食（米饭或面食）、一荤一素或两菜一汤等。
@@ -48,44 +48,18 @@ daily_meal_plan_prompt = """
 
 请以JSON格式输出结果，结构如下：
 {{
-  "breakfast": {{
+  "day": "{day}",
+  "meal": "{meal}",
+  "menu": {{
     "total_calories": "XXKcal",
     "dishes": [
       {{
         "name": "菜品名称",
-        "quantity": "份量",
+        "quantity": "份量"
       }},
       {{
         "name": "菜品名称",
-        "quantity": "份量",
-      }},
-      ...
-    ]
-  }},
-  "lunch": {{
-    "total_calories": "XXKcal",
-    "dishes": [
-      {{
-        "name": "菜品名称",
-        "quantity": "份量",
-      }},
-      {{
-        "name": "菜品名称",
-        "quantity": "份量",
-      }},
-      ...
-    ]
-  }},
-  "dinner": {{
-    "total_calories": "XXKcal",
-    "dishes": [
-      {{
-        "name": "菜品名称",
-        "quantity": "份量",
-      }},
-      {{
-        "name": "菜品名称",
-        "quantity": "份量",
+        "quantity": "份量"
       }},
       ...
     ]
