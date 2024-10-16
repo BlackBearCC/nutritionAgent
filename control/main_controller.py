@@ -24,23 +24,30 @@ async def main():
     analysis_module = AnalysisModule()
     analysis_result = await analysis_module.process({'user_info': user_info})
     logging.info("用户信息分析完成")
-    
-    # logging.info("开始生成食谱框架")
-    # frame_module = FrameModule()
-    # frame_result = await frame_module.process({
-    #     'analysis_result': analysis_result,
-    #     'user_info': user_info
-    # })
-    # logging.info("食谱框架生成完成")
 
-    logging.info("开始生成7天食谱")
-    generation_module = GenerationModule()
-    weekly_recipes = await generation_module.process({
+    #################################
+    logging.info("开始生成食谱框架")
+    frame_module = FrameModule()
+    frame_result = await frame_module.process({
         'analysis_result': analysis_result,
         'user_info': user_info
     })
-    logging.info("7天食谱生成完成")
-    
+    logging.info("食谱框架生成完成")
+    #################################
+
+
+    #################################
+    # 一次生成7天食谱耗时约35秒
+    # logging.info("开始生成7天食谱")
+    # generation_module = GenerationModule()
+    # weekly_recipes = await generation_module.process({
+    #     'analysis_result': analysis_result,
+    #     'user_info': user_info
+    # })
+    # logging.info("7天食谱生成完成")
+    #################################
+
+
     # print("分析结果:", json.dumps(analysis_result, ensure_ascii=False, indent=2))
 
     
