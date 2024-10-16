@@ -16,7 +16,7 @@ class GenerationModule(BaseAgentModule):
             "user_info": user_info
         }
         
-        weekly_recipe_result = await self.async_call_llm(weekly_recipe_generation_template, weekly_recipe_input,llm_name="qwen-max")
+        weekly_recipe_result = await self.async_call_llm(weekly_recipe_generation_template, weekly_recipe_input,llm_name="qwen-turbo")
         
         try:
             weekly_recipes = json.loads(weekly_recipe_result)
