@@ -95,15 +95,17 @@ async def main():
                     logging.info(f"新生成的餐食计划: {new_meal_plan}")
                     day = new_meal_plan.get('day')
                     meal = new_meal_plan.get('meal')
-                    menu = new_meal_plan.get('menu')
                     
-                    if not all([day, meal, menu]):
+                    if not all([day, meal, new_meal_plan.get('menu')]):
                         logging.error(f"新生成的餐食计划格式不正确: {new_meal_plan}")
                         continue
                     
-                    if day not in weekly_meal_plan:
-                        weekly_meal_plan[day] = {}
-                    weekly_meal_plan[day][meal] = menu
+                    for i, plan in enumerate(weekly_meal_plan):
+                        if plan['day'] == day and plan['meal'] == meal:
+                            weekly_meal_plan[i] = new_meal_plan
+                            break
+                    else:
+                        weekly_meal_plan.append(new_meal_plan)
                     logging.info(f"成功重新生成第 {day} 天的 {meal}")
                 except json.JSONDecodeError:
                     logging.error(f"重新生成的 {batch_name} 不是有效的JSON格式")

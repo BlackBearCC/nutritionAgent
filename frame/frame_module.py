@@ -9,7 +9,7 @@ class FrameModule(BaseAgentModule):
         analysis_result = input_data.get('analysis_result')
         user_info = input_data.get('user_info')
         specific_meal = input_data.get('specific_meal')
-        weekly_meal_plan = input_data.get('weekly_meal_plan', {})
+        weekly_meal_plan = input_data.get('weekly_meal_plan', [])
         
         if specific_meal:
             return await self.regenerate_specific_meal(analysis_result, user_info, specific_meal, weekly_meal_plan)
@@ -57,8 +57,7 @@ class FrameModule(BaseAgentModule):
         for batch_name, result in results.items():
             try:
                 meal_plan = json.loads(result)
-                weekly_meal_plan[meal_plan['day']] = weekly_meal_plan.get(meal_plan['day'], {})
-                weekly_meal_plan[meal_plan['day']][meal_plan['meal']] = meal_plan['menu']
+                weekly_meal_plan.append(meal_plan)
             except json.JSONDecodeError:
                 logging.error(f"{batch_name} 的食谱框架不是有效的JSON格式")
         
@@ -82,8 +81,12 @@ class FrameModule(BaseAgentModule):
         
         try:
             new_meal_plan = json.loads(new_meal_plan)
-            weekly_meal_plan[day] = weekly_meal_plan.get(day, {})
-            weekly_meal_plan[day][meal] = new_meal_plan['menu']
+            for i, plan in enumerate(weekly_meal_plan):
+                if plan['day'] == day and plan['meal'] == meal:
+                    weekly_meal_plan[i] = new_meal_plan
+                    break
+            else:
+                weekly_meal_plan.append(new_meal_plan)
             logging.info(f"成功重新生成第 {day} 天的 {meal}")
             return weekly_meal_plan
         except json.JSONDecodeError:
@@ -99,9 +102,9 @@ class FrameModule(BaseAgentModule):
 
     def get_ingredients_for_day(self, weekly_meal_plan, day):
         all_ingredients = set()
-        if day in weekly_meal_plan:
-            for meal in weekly_meal_plan[day].values():
-                for dish in meal.get('dishes', []):
+        for plan in weekly_meal_plan:
+            if plan['day'] == day:
+                for dish in plan['menu']['dishes']:
                     all_ingredients.update(dish.get('ingredients', []))
         if not all_ingredients:
             logging.warning(f"第 {day} 天的食谱不存在或没有食材")
