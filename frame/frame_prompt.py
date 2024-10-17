@@ -48,7 +48,7 @@ meal_plan_prompt = """
 
 请以JSON格式输出结果，结构如下：
 {{
-  "day": "{day}",
+  "day": {day},// 注意这里直接输出整数
   "meal": "{meal}",
   "menu": {{
     "total_calories": "XXKcal",

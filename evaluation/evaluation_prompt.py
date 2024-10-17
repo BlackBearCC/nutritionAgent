@@ -26,7 +26,7 @@ weekly_meal_evaluation_prompt = """
   "general_comments": "总体评价和综合建议",
   "improvement_suggestions": [
     {{
-      "day": "第几天(编号1.2...7)",
+      "day": 第几天(编号1.2...7),//注意这里直接输出单个整数
       "meal": "breakfast/lunch/dinner",
       "issue": "问题描述",
       "suggestion": "改进建议"
@@ -35,7 +35,7 @@ weekly_meal_evaluation_prompt = """
   ]
 }}
 
-##请确保JSON格式正确并只返回{{}}内的正文内容，禁止在day或meal中使用复数或汉字，只允许输入单个编号，不要添加任何额外的文本或解释。
+##请确保JSON格式正确并只返回{{}}内的正文内容，day必须是1-7中的单个整数，meal只能是breakfast/lunch/dinner之一，不要添加任何额外的文本或解释。
 """
 
 follow_up_evaluation_prompt = """
@@ -64,7 +64,7 @@ follow_up_evaluation_prompt = """
   "general_comments": "总体评价和综合建议",
   "improvement_suggestions": [
     {{
-      "day": "第几天(1-7)",
+      "day": 第几天(编号1.2...7),//注意这里直接输出单个整数
       "meal": "breakfast/lunch/dinner",
       "issue": "问题描述",
       "suggestion": "改进建议"
@@ -76,5 +76,5 @@ follow_up_evaluation_prompt = """
 
 如果所有问题都已解决，没有新的问题，请将 "evaluation_complete" 设置为 true。否则设置为 false。
 
-##请确保JSON格式正确并只返回{{}}内的正文内容，不要添加任何额外的文本或解释。
+##请确保JSON格式正确并只返回{{}}内的正文内容，day必须是1-7中的单个整数，meal只能是breakfast/lunch/dinner之一，不要添加任何额外的文本或解释。
 """

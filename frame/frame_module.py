@@ -107,8 +107,9 @@ class FrameModule(BaseAgentModule):
 
     def get_ingredients_for_day(self, weekly_meal_plan, day):
         all_ingredients = set()
+        day = int(day)  # 确保 day 是整数
         for plan in weekly_meal_plan:
-            if str(plan.get('day')) == str(day):
+            if plan.get('day') == day:  # 直接比较整数
                 for dish in plan.get('menu', {}).get('dishes', []):
                     all_ingredients.update(dish.get('ingredients', []))
         if not all_ingredients:

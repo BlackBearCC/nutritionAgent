@@ -120,8 +120,8 @@ async def main():
                     'invoke_input': {
                         'analysis_result': analysis_result,
                         'user_info': user_info,
-                        'day_ingredients': frame_module.get_ingredients_for_day(weekly_meal_plan, str(suggestion['day'])),
-                        'day': str(suggestion['day']),
+                        'day_ingredients': frame_module.get_ingredients_for_day(weekly_meal_plan, int(suggestion['day'])),
+                        'day': int(suggestion['day']),  # 确保 day 是整数
                         'meal': suggestion['meal']
                     }
                 })
@@ -133,10 +133,10 @@ async def main():
                 try:
                     new_meal_plan = json.loads(result)
                     logging.info(f"新生成的餐食计划: {new_meal_plan}")
-                    day = new_meal_plan.get('day')
+                    day = int(new_meal_plan.get('day'))  # 确保 day 是整数
                     meal = new_meal_plan.get('meal')
                     
-                    if not all([day, meal, new_meal_plan.get('menu')]):
+                    if not all([isinstance(day, int), meal, new_meal_plan.get('menu')]):
                         logging.error(f"新生成的餐食计划格式不正确: {new_meal_plan}")
                         continue
                     
@@ -159,9 +159,26 @@ async def main():
     if iteration_count == max_iterations:
         logging.warning("达到最大迭代次数，评估过程终止")
 
-    # print("最终分析结果:", json.dumps(analysis_result, ensure_ascii=False, indent=2))
-    # print("最终食谱框架结果:", json.dumps(weekly_meal_plan, ensure_ascii=False, indent=2))
-    # print("评估历史:", json.dumps(evaluation_history, ensure_ascii=False, indent=2))
+    # 记录最终的完整7天膳食计划
+    log_module_io("FinalMealPlan", {}, weekly_meal_plan, csv_file)
+    logging.info("最终的7天膳食计划已记录到module_io_log.csv")
+
+    # 记录评估历史
+    log_module_io("EvaluationHistory", {}, evaluation_history, csv_file)
+    logging.info("评估历史已记录到module_io_log.csv")
+
+    # 输出最终结果摘要
+    summary = {
+        "总迭代次数": iteration_count,
+        "最终评分": evaluation_result.get('overall_score', 'N/A'),
+        "最终评价": evaluation_result.get('general_comments', 'N/A')
+    }
+    log_module_io("FinalSummary", {}, summary, csv_file)
+
+    logging.info("膳食计划生成和评估过程完成")
+    logging.info(f"总迭代次数: {iteration_count}")
+    logging.info(f"最终评分: {evaluation_result.get('overall_score', 'N/A')}")
+    logging.info(f"最终评价: {evaluation_result.get('general_comments', 'N/A')}")
 
 # 运行异步主函数
 asyncio.run(main())
