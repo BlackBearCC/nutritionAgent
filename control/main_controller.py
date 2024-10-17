@@ -68,10 +68,9 @@ async def main():
         'analysis_result': analysis_result,
         'user_info': user_info
     }
-    ingredient_input, ingredient_result, meal_plan_input, meal_plan_result = await frame_module.process(frame_input)
-    log_module_io("FrameModule_IngredientGeneration", ingredient_input, ingredient_result, csv_file)
-    log_module_io("FrameModule_MealPlanGeneration", meal_plan_input, meal_plan_result, csv_file)
-    weekly_meal_plan = meal_plan_result
+    ingredient_input, ingredient_groups, meal_plan_input, weekly_meal_plan = await frame_module.process(frame_input)
+    log_module_io("FrameModule_IngredientGeneration", ingredient_input, ingredient_groups, csv_file)
+    log_module_io("FrameModule_MealPlanGeneration", meal_plan_input, weekly_meal_plan, csv_file)
     logging.info("食谱框架生成完成")
     #################################
 
@@ -112,16 +111,19 @@ async def main():
         improvement_suggestions = evaluation_result.get('improvement_suggestions', [])
         if improvement_suggestions:
             logging.info("开始批量重新生成食谱")
+            logging.info(f"当前的weekly_meal_plan: {json.dumps(weekly_meal_plan, ensure_ascii=False, indent=2)}")
             batch_inputs = []
             for suggestion in improvement_suggestions:
+                day_ingredients = frame_module.get_ingredients_for_day(weekly_meal_plan, int(suggestion['day']), ingredient_groups)
+                logging.info(f"第 {suggestion['day']} 天的食材: {day_ingredients}")
                 batch_inputs.append({
                     'batch_name': f"{suggestion['day']}_{suggestion['meal']}",
                     'prompt_template': frame_prompt.meal_plan_prompt,
                     'invoke_input': {
                         'analysis_result': analysis_result,
                         'user_info': user_info,
-                        'day_ingredients': frame_module.get_ingredients_for_day(weekly_meal_plan, int(suggestion['day'])),
-                        'day': int(suggestion['day']),  # 确保 day 是整数
+                        'day_ingredients': day_ingredients,
+                        'day': int(suggestion['day']),
                         'meal': suggestion['meal']
                     }
                 })
@@ -152,7 +154,7 @@ async def main():
                 except Exception as e:
                     logging.error(f"处理 {batch_name} 时发生错误: {str(e)}")
 
-        logging.info(f"当前的weekly_meal_plan: {json.dumps(weekly_meal_plan, ensure_ascii=False, indent=2)}")
+        logging.info(f"更新后的weekly_meal_plan: {json.dumps(weekly_meal_plan, ensure_ascii=False, indent=2)}")
 
         iteration_count += 1
 

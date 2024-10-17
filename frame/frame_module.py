@@ -18,7 +18,7 @@ class FrameModule(BaseAgentModule):
         
         # 第一步：生成食材并分组
         ingredient_input = {
-            "analysis_result": analysis_result,  # 不再使用 json.dumps
+            "analysis_result": analysis_result,
             "user_info": user_info,
             "food_database": self.get_food_database()
         }
@@ -67,17 +67,17 @@ class FrameModule(BaseAgentModule):
         # 移除 prompt_template，以便日志记录
         batch_inputs_for_log = [{k: v for k, v in input_data.items() if k != 'prompt_template'} for input_data in batch_inputs]
         
-        return ingredient_input, ingredient_result, batch_inputs_for_log, weekly_meal_plan
+        return ingredient_input, ingredient_groups, batch_inputs_for_log, weekly_meal_plan
 
     async def regenerate_specific_meal(self, analysis_result, user_info, specific_meal, weekly_meal_plan):
-        day, meal = specific_meal['day'], specific_meal['meal']
-        ingredients = self.get_ingredients_for_day(weekly_meal_plan, day)
+        day, meal = int(specific_meal['day']), specific_meal['meal']  # 确保 day 是整数
+        ingredients = self.get_ingredients_for_day(weekly_meal_plan, day, ingredient_groups)
         
         meal_plan_template = frame_prompt.meal_plan_prompt
         invoke_input = {
-            "analysis_result": json.dumps(analysis_result),
+            "analysis_result": analysis_result,  # 不再使用 json.dumps
             "user_info": user_info,
-            "day_ingredients": json.dumps(ingredients),
+            "day_ingredients": ingredients,  # 不再使用 json.dumps
             "day": day,
             "meal": meal
         }
@@ -85,17 +85,17 @@ class FrameModule(BaseAgentModule):
         new_meal_plan = await self.async_call_llm(meal_plan_template, invoke_input)
         
         try:
-            new_meal_plan = json.loads(new_meal_plan)
+            new_meal_plan = json.loads(new_meal_plan) if isinstance(new_meal_plan, str) else new_meal_plan
             for i, plan in enumerate(weekly_meal_plan):
                 if plan['day'] == day and plan['meal'] == meal:
                     weekly_meal_plan[i] = new_meal_plan
                     break
             else:
                 weekly_meal_plan.append(new_meal_plan)
-            logging.info(f"成功重新生成第 {day} 天的 {meal}")
+            self.logger.info(f"成功重新生成第 {day} 天的 {meal}")
             return weekly_meal_plan
         except json.JSONDecodeError:
-            logging.error(f"重新生成的第 {day} 天的 {meal} 不是有效的JSON格式")
+            self.logger.error(f"重新生成的第 {day} 天的 {meal} 不是有效的JSON格式")
             return weekly_meal_plan
 
     def get_food_database(self):
@@ -105,13 +105,11 @@ class FrameModule(BaseAgentModule):
         #         "茄子", "豆腐", "鸡蛋", "牛奶", "酸奶", "燕麦", "全麦面包", "糙米", "红薯", "土豆"]
         return "无"
 
-    def get_ingredients_for_day(self, weekly_meal_plan, day):
-        all_ingredients = set()
-        day = int(day)  # 确保 day 是整数
-        for plan in weekly_meal_plan:
-            if plan.get('day') == day:  # 直接比较整数
-                for dish in plan.get('menu', {}).get('dishes', []):
-                    all_ingredients.update(dish.get('ingredients', []))
-        if not all_ingredients:
-            self.logger.warning(f"第 {day} 天的食谱不存在或没有食材")
-        return list(all_ingredients)
+    def get_ingredients_for_day(self, weekly_meal_plan, day, ingredient_groups):
+        day = int(day)
+        day_ingredients = ingredient_groups.get(f"day{day}", [])
+        
+        self.logger.info(f"获取第 {day} 天的食材")
+        self.logger.info(f"第 {day} 天的食材: {day_ingredients}")
+        
+        return day_ingredients
