@@ -106,7 +106,7 @@ async def main():
         evaluation_history.append(evaluation_result)
 
         if evaluation_result.get('evaluation_complete', False):
-            logging.info("评估��成，无需进一步修改")
+            logging.info("评估完成，无需进一步修改")
             break
 
         improvement_suggestions = evaluation_result.get('improvement_suggestions', [])
@@ -116,11 +116,12 @@ async def main():
             for suggestion in improvement_suggestions:
                 batch_inputs.append({
                     'batch_name': f"{suggestion['day']}_{suggestion['meal']}",
+                    'prompt_template': frame_prompt.meal_plan_prompt,
                     'invoke_input': {
-                        'analysis_result': json.dumps(analysis_result),
+                        'analysis_result': analysis_result,
                         'user_info': user_info,
-                        'day_ingredients': json.dumps(frame_module.get_ingredients_for_day(weekly_meal_plan, suggestion['day'])),
-                        'day': suggestion['day'],
+                        'day_ingredients': frame_module.get_ingredients_for_day(weekly_meal_plan, str(suggestion['day'])),
+                        'day': str(suggestion['day']),
                         'meal': suggestion['meal']
                     }
                 })

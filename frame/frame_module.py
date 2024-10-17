@@ -108,9 +108,9 @@ class FrameModule(BaseAgentModule):
     def get_ingredients_for_day(self, weekly_meal_plan, day):
         all_ingredients = set()
         for plan in weekly_meal_plan:
-            if plan['day'] == day:
-                for dish in plan['menu']['dishes']:
+            if str(plan.get('day')) == str(day):
+                for dish in plan.get('menu', {}).get('dishes', []):
                     all_ingredients.update(dish.get('ingredients', []))
         if not all_ingredients:
-            logging.warning(f"第 {day} 天的食谱不存在或没有食材")
+            self.logger.warning(f"第 {day} 天的食谱不存在或没有食材")
         return list(all_ingredients)

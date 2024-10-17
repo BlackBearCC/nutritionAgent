@@ -13,23 +13,17 @@ class EvaluationModule(BaseAgentModule):
         
         logging.info("开始评估7天食谱")
         
-        if not evaluation_history:
-            # 首次评估
-            evaluation_input = {
-                "analysis_result": json.dumps(analysis_result),
-                "user_info": user_info,
-                "weekly_meal_plan": json.dumps(weekly_meal_plan)
-            }
-            prompt = weekly_meal_evaluation_prompt
-        else:
-            # 后续评估
-            evaluation_input = {
-                "analysis_result": json.dumps(analysis_result),
-                "user_info": user_info,
-                "weekly_meal_plan": json.dumps(weekly_meal_plan),
-                "evaluation_history": json.dumps(evaluation_history)
-            }
+        evaluation_input = {
+            "analysis_result": analysis_result,
+            "user_info": user_info,
+            "weekly_meal_plan": weekly_meal_plan
+        }
+        
+        if evaluation_history:
+            evaluation_input["evaluation_history"] = evaluation_history
             prompt = follow_up_evaluation_prompt
+        else:
+            prompt = weekly_meal_evaluation_prompt
         
         evaluation_result = await self.async_call_llm(prompt, evaluation_input)
         
