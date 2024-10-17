@@ -74,6 +74,7 @@ class BaseAgentModule(ABC):
     async def _process_single_task(self, batch_name, prompt_template, invoke_input, kwargs, index, total_tasks):
         self.logger.info(f"处理中: {batch_name} ({index}/{total_tasks})")
         try:
+            
             result = await self.async_call_llm(prompt_template, invoke_input, **kwargs)
             self.logger.info(f"完成: {batch_name} ({index}/{total_tasks})")
             return batch_name, result

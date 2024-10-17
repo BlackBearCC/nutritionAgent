@@ -2,6 +2,8 @@ import asyncio
 import sys
 import os
 import json
+import csv
+from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
@@ -19,22 +21,57 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
+def log_module_io(module_name, input_data, output_data, csv_file):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    def format_data(data):
+        if isinstance(data, str):
+            try:
+                return json.loads(data)
+            except json.JSONDecodeError:
+                return data
+        elif isinstance(data, dict):
+            return {k: format_data(v) for k, v in data.items() if k != 'prompt_template'}
+        elif isinstance(data, list):
+            return [format_data(item) for item in data]
+        else:
+            return data
+    
+    formatted_input = format_data(input_data)
+    formatted_output = format_data(output_data)
+    
+    with open(csv_file, 'a', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file, quoting=csv.QUOTE_ALL)
+        writer.writerow([timestamp, module_name, "输入", json.dumps(formatted_input, ensure_ascii=False)])
+        writer.writerow([timestamp, module_name, "输出", json.dumps(formatted_output, ensure_ascii=False)])
+
 async def main():
+    csv_file = "module_io_log.csv"
+    with open(csv_file, 'w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+        writer.writerow(["Timestamp", "Module", "Type", "Data"])
+
     user_info = """
     根据用户标签（女性，35岁，身高160厘米，体重45千克，尿酸高），主诉（降尿酸，美白），"""
     
     logging.info("开始分析用户信息")
     analysis_module = AnalysisModule()
-    analysis_result = await analysis_module.process({'user_info': user_info})
+    analysis_input = {'user_info': user_info}
+    analysis_result = await analysis_module.process(analysis_input)
+    log_module_io("AnalysisModule", analysis_input, analysis_result, csv_file)
     logging.info("用户信息分析完成")
 
     #################################
     logging.info("开始生成食谱框架")
     frame_module = FrameModule()
-    weekly_meal_plan = await frame_module.process({
+    frame_input = {
         'analysis_result': analysis_result,
         'user_info': user_info
-    })
+    }
+    ingredient_input, ingredient_result, meal_plan_input, meal_plan_result = await frame_module.process(frame_input)
+    log_module_io("FrameModule_IngredientGeneration", ingredient_input, ingredient_result, csv_file)
+    log_module_io("FrameModule_MealPlanGeneration", meal_plan_input, meal_plan_result, csv_file)
+    weekly_meal_plan = meal_plan_result
     logging.info("食谱框架生成完成")
     #################################
 
@@ -58,16 +95,18 @@ async def main():
 
     while iteration_count < max_iterations:
         logging.info(f"开始第 {iteration_count + 1} 次评估")
-        evaluation_result = await evaluation_module.process({
+        evaluation_input = {
             'analysis_result': analysis_result,
             'user_info': user_info,
             'weekly_meal_plan': weekly_meal_plan,
             'evaluation_history': evaluation_history
-        })
+        }
+        evaluation_result = await evaluation_module.process(evaluation_input)
+        log_module_io(f"EvaluationModule_Iteration_{iteration_count + 1}", evaluation_input, evaluation_result, csv_file)
         evaluation_history.append(evaluation_result)
 
         if evaluation_result.get('evaluation_complete', False):
-            logging.info("评估完成，无需进一步修改")
+            logging.info("评估��成，无需进一步修改")
             break
 
         improvement_suggestions = evaluation_result.get('improvement_suggestions', [])
@@ -77,7 +116,6 @@ async def main():
             for suggestion in improvement_suggestions:
                 batch_inputs.append({
                     'batch_name': f"{suggestion['day']}_{suggestion['meal']}",
-                    'prompt_template': frame_prompt.meal_plan_prompt,
                     'invoke_input': {
                         'analysis_result': json.dumps(analysis_result),
                         'user_info': user_info,
@@ -88,6 +126,7 @@ async def main():
                 })
             
             batch_results = await frame_module.batch_async_call_llm(batch_inputs)
+            log_module_io(f"FrameModule_Regeneration_Iteration_{iteration_count + 1}", batch_inputs, batch_results, csv_file)
             
             for batch_name, result in batch_results.items():
                 try:
