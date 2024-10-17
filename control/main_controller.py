@@ -66,6 +66,7 @@ async def main():
     log_module_io("AnalysisModule", analysis_input, analysis_result, csv_file, analysis_execution_time)
     logging.info("用户信息分析完成")
 
+    #################################
     logging.info("开始生成食谱框架")
     frame_module = FrameModule()
     frame_start_time = time.time()
@@ -126,7 +127,7 @@ async def main():
             batch_inputs = []
             for suggestion in improvement_suggestions:
                 day_ingredients = frame_module.get_ingredients_for_day(weekly_meal_plan, int(suggestion['day']), ingredient_groups)
-                logging.info(f"第 {suggestion['day']} 天的食材: {day_ingredients}")
+                # logging.info(f"第 {suggestion['day']} 天的食材: {day_ingredients}")
                 batch_inputs.append({
                     'batch_name': f"{suggestion['day']}_{suggestion['meal']}",
                     'prompt_template': frame_prompt.meal_plan_prompt,

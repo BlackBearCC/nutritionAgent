@@ -22,7 +22,7 @@ class FrameModule(BaseAgentModule):
             "user_info": user_info,
             "food_database": self.get_food_database()
         }
-        ingredient_result = await self.async_call_llm(frame_prompt.ingredient_generation_prompt, ingredient_input)
+        ingredient_result = await self.async_call_llm(frame_prompt.ingredient_generation_prompt, ingredient_input,parse_json=True)
         
         try:
             ingredient_groups = json.loads(ingredient_result) if isinstance(ingredient_result, str) else ingredient_result
@@ -82,7 +82,7 @@ class FrameModule(BaseAgentModule):
             "meal": meal
         }
         
-        new_meal_plan = await self.async_call_llm(meal_plan_template, invoke_input)
+        new_meal_plan = await self.async_call_llm(meal_plan_template, invoke_input,parse_json=True)
         
         try:
             new_meal_plan = json.loads(new_meal_plan) if isinstance(new_meal_plan, str) else new_meal_plan
