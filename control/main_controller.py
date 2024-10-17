@@ -4,6 +4,7 @@ import os
 import json
 import csv
 from datetime import datetime
+import time
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
@@ -21,7 +22,7 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-def log_module_io(module_name, input_data, output_data, csv_file):
+def log_module_io(module_name, input_data, output_data, csv_file, execution_time):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     def format_data(data):
@@ -44,8 +45,10 @@ def log_module_io(module_name, input_data, output_data, csv_file):
         writer = csv.writer(file, quoting=csv.QUOTE_ALL)
         writer.writerow([timestamp, module_name, "输入", json.dumps(formatted_input, ensure_ascii=False)])
         writer.writerow([timestamp, module_name, "输出", json.dumps(formatted_output, ensure_ascii=False)])
+        writer.writerow([timestamp, module_name, "执行时间", f"{execution_time:.2f}秒"])
 
 async def main():
+    start_time = time.time()
     csv_file = "module_io_log.csv"
     with open(csv_file, 'w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
@@ -56,21 +59,24 @@ async def main():
     
     logging.info("开始分析用户信息")
     analysis_module = AnalysisModule()
+    analysis_start_time = time.time()
     analysis_input = {'user_info': user_info}
     analysis_result = await analysis_module.process(analysis_input)
-    log_module_io("AnalysisModule", analysis_input, analysis_result, csv_file)
+    analysis_execution_time = time.time() - analysis_start_time
+    log_module_io("AnalysisModule", analysis_input, analysis_result, csv_file, analysis_execution_time)
     logging.info("用户信息分析完成")
 
-    #################################
     logging.info("开始生成食谱框架")
     frame_module = FrameModule()
+    frame_start_time = time.time()
     frame_input = {
         'analysis_result': analysis_result,
         'user_info': user_info
     }
     ingredient_input, ingredient_groups, meal_plan_input, weekly_meal_plan = await frame_module.process(frame_input)
-    log_module_io("FrameModule_IngredientGeneration", ingredient_input, ingredient_groups, csv_file)
-    log_module_io("FrameModule_MealPlanGeneration", meal_plan_input, weekly_meal_plan, csv_file)
+    frame_execution_time = time.time() - frame_start_time
+    log_module_io("FrameModule_IngredientGeneration", ingredient_input, ingredient_groups, csv_file, frame_execution_time)
+    log_module_io("FrameModule_MealPlanGeneration", meal_plan_input, weekly_meal_plan, csv_file, frame_execution_time)
     logging.info("食谱框架生成完成")
     #################################
 
@@ -90,10 +96,13 @@ async def main():
     evaluation_module = EvaluationModule()
     evaluation_history = []
     iteration_count = 0
-    max_iterations = 5  
+    max_iterations = 5
+    total_evaluation_time = 0
+    total_regeneration_time = 0
 
     while iteration_count < max_iterations:
         logging.info(f"开始第 {iteration_count + 1} 次评估")
+        evaluation_start_time = time.time()
         evaluation_input = {
             'analysis_result': analysis_result,
             'user_info': user_info,
@@ -101,7 +110,9 @@ async def main():
             'evaluation_history': evaluation_history
         }
         evaluation_result = await evaluation_module.process(evaluation_input)
-        log_module_io(f"EvaluationModule_Iteration_{iteration_count + 1}", evaluation_input, evaluation_result, csv_file)
+        evaluation_execution_time = time.time() - evaluation_start_time
+        total_evaluation_time += evaluation_execution_time
+        log_module_io(f"EvaluationModule_Iteration_{iteration_count + 1}", evaluation_input, evaluation_result, csv_file, evaluation_execution_time)
         evaluation_history.append(evaluation_result)
 
         if evaluation_result.get('evaluation_complete', False):
@@ -111,7 +122,7 @@ async def main():
         improvement_suggestions = evaluation_result.get('improvement_suggestions', [])
         if improvement_suggestions:
             logging.info("开始批量重新生成食谱")
-            logging.info(f"当前的weekly_meal_plan: {json.dumps(weekly_meal_plan, ensure_ascii=False, indent=2)}")
+            regeneration_start_time = time.time()
             batch_inputs = []
             for suggestion in improvement_suggestions:
                 day_ingredients = frame_module.get_ingredients_for_day(weekly_meal_plan, int(suggestion['day']), ingredient_groups)
@@ -129,7 +140,9 @@ async def main():
                 })
             
             batch_results = await frame_module.batch_async_call_llm(batch_inputs)
-            log_module_io(f"FrameModule_Regeneration_Iteration_{iteration_count + 1}", batch_inputs, batch_results, csv_file)
+            regeneration_execution_time = time.time() - regeneration_start_time
+            total_regeneration_time += regeneration_execution_time
+            log_module_io(f"FrameModule_Regeneration_Iteration_{iteration_count + 1}", batch_inputs, batch_results, csv_file, regeneration_execution_time)
             
             for batch_name, result in batch_results.items():
                 try:
@@ -154,33 +167,40 @@ async def main():
                 except Exception as e:
                     logging.error(f"处理 {batch_name} 时发生错误: {str(e)}")
 
-        logging.info(f"更新后的weekly_meal_plan: {json.dumps(weekly_meal_plan, ensure_ascii=False, indent=2)}")
-
         iteration_count += 1
 
     if iteration_count == max_iterations:
         logging.warning("达到最大迭代次数，评估过程终止")
 
     # 记录最终的完整7天膳食计划
-    log_module_io("FinalMealPlan", {}, weekly_meal_plan, csv_file)
+    log_module_io("FinalMealPlan", {}, weekly_meal_plan, csv_file, 0)
     logging.info("最终的7天膳食计划已记录到module_io_log.csv")
 
     # 记录评估历史
-    log_module_io("EvaluationHistory", {}, evaluation_history, csv_file)
+    log_module_io("EvaluationHistory", {}, evaluation_history, csv_file, 0)
     logging.info("评估历史已记录到module_io_log.csv")
+
+    # 计算总耗时
+    total_execution_time = time.time() - start_time
 
     # 输出最终结果摘要
     summary = {
         "总迭代次数": iteration_count,
         "最终评分": evaluation_result.get('overall_score', 'N/A'),
-        "最终评价": evaluation_result.get('general_comments', 'N/A')
+        "最终评价": evaluation_result.get('general_comments', 'N/A'),
+        "分析模块耗时": f"{analysis_execution_time:.2f}秒",
+        "框架生成耗时": f"{frame_execution_time:.2f}秒",
+        "评估总耗时": f"{total_evaluation_time:.2f}秒",
+        "重新生成总耗时": f"{total_regeneration_time:.2f}秒",
+        "总耗时": f"{total_execution_time:.2f}秒"
     }
-    log_module_io("FinalSummary", {}, summary, csv_file)
+    log_module_io("FinalSummary", {}, summary, csv_file, total_execution_time)
 
     logging.info("膳食计划生成和评估过程完成")
     logging.info(f"总迭代次数: {iteration_count}")
     logging.info(f"最终评分: {evaluation_result.get('overall_score', 'N/A')}")
     logging.info(f"最终评价: {evaluation_result.get('general_comments', 'N/A')}")
+    logging.info(f"总耗时: {total_execution_time:.2f}秒")
 
 # 运行异步主函数
 asyncio.run(main())
