@@ -107,3 +107,71 @@ cooking_method_prompt = """
 
 请为早餐、午餐和晚餐推荐清蒸/红烧等各种烹饪方式，并10-20字简要说明推荐原因。请确保烹饪方式适合选定的食材，并有助于实现预期的营养目标。
 """
+daily_meal_validation_prompt = """
+作为一位营养专家，请审核并调整第{day}天的三餐计划，确保其合理性和多样性：
+
+分析结果：
+{analysis_result}
+
+用户信息：
+{user_info}
+
+当天三餐计划：
+{day_meals}
+
+请遵循以下步骤：
+1. 审核三餐是否符合用户的营养需求和健康状况。
+2. 检查三餐之间的多样性，避免重复的食材或烹饪方式。
+3. 确保每餐的热量分配合理。
+4. 如果发现问题，请直接调整菜品，使其更加合理和多样化。
+5. 保持中国传统饮食习惯。
+
+请以JSON格式输出调整后的三餐计划，结构如下：
+[
+  {{
+    "day": {day},
+    "meal": "breakfast",
+    "menu": {{
+      "total_calories": "XXKcal",
+      "dishes": [
+        {{
+          "name": "菜品名称",
+          "quantity": "份量"
+        }},
+        ...
+      ]
+    }}
+  }},
+  {{
+    "day": {day},
+    "meal": "lunch",
+    "menu": {{
+      "total_calories": "XXKcal",
+      "dishes": [
+        {{
+          "name": "菜品名称",
+          "quantity": "份量"
+        }},
+        ...
+      ]
+    }}
+  }},
+  {{
+    "day": {day},
+    "meal": "dinner",
+    "menu": {{
+      "total_calories": "XXKcal",
+      "dishes": [
+        {{
+          "name": "菜品名称",
+          "quantity": "份量"
+        }},
+        ...
+      ]
+    }}
+  }}
+]
+
+请确保JSON格式正确并只返回[]内的正文内容，不要添加任何额外的文本或解释。
+"""
+
