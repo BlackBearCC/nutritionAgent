@@ -69,20 +69,28 @@ class FrameModule(BaseAgentModule):
         
         return ingredient_input, ingredient_groups, batch_inputs_for_log, weekly_meal_plan
 
-    async def regenerate_specific_meal(self, analysis_result, user_info, specific_meal, weekly_meal_plan):
-        day, meal = int(specific_meal['day']), specific_meal['meal']  # 确保 day 是整数
+    async def regenerate_specific_meal(self, analysis_result, user_info, specific_meal, weekly_meal_plan, ingredient_groups):
+        day, meal = int(specific_meal['day']), specific_meal['meal']
         ingredients = self.get_ingredients_for_day(weekly_meal_plan, day, ingredient_groups)
         
-        meal_plan_template = frame_prompt.meal_plan_prompt
+        # 获取上次生成的结果
+        previous_meal = next((plan for plan in weekly_meal_plan if plan['day'] == day and plan['meal'] == meal), None)
+        
+        # 获取改进建议
+        improvement_suggestion = specific_meal.get('suggestion', '')
+        
+        meal_plan_template = frame_prompt.regenerate_meal_plan_prompt
         invoke_input = {
-            "analysis_result": analysis_result,  # 不再使用 json.dumps
+            "analysis_result": analysis_result,
             "user_info": user_info,
-            "day_ingredients": ingredients,  # 不再使用 json.dumps
+            "day_ingredients": ingredients,
             "day": day,
-            "meal": meal
+            "meal": meal,
+            "previous_meal": json.dumps(previous_meal) if previous_meal else "None",
+            "improvement_suggestion": improvement_suggestion
         }
         
-        new_meal_plan = await self.async_call_llm(meal_plan_template, invoke_input,parse_json=True)
+        new_meal_plan = await self.async_call_llm(meal_plan_template, invoke_input, parse_json=True)
         
         try:
             new_meal_plan = json.loads(new_meal_plan) if isinstance(new_meal_plan, str) else new_meal_plan
@@ -93,10 +101,10 @@ class FrameModule(BaseAgentModule):
             else:
                 weekly_meal_plan.append(new_meal_plan)
             self.logger.info(f"成功重新生成第 {day} 天的 {meal}")
-            return weekly_meal_plan
+            return new_meal_plan
         except json.JSONDecodeError:
             self.logger.error(f"重新生成的第 {day} 天的 {meal} 不是有效的JSON格式")
-            return weekly_meal_plan
+            return None
 
     def get_food_database(self):
         # return ["鸡胸肉", "牛肉", "猪五花", "羊肉", "鸭肉", "鹅肉", "兔肉", "鱼肉", "虾", "蟹肉",

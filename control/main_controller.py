@@ -101,49 +101,42 @@ async def main():
         if improvement_suggestions:
             logging.info("开始批量重新生成食谱")
             regeneration_start_time = time.time()
-            batch_inputs = []
-            for suggestion in improvement_suggestions:
-                day_ingredients = frame_module.get_ingredients_for_day(weekly_meal_plan, int(suggestion['day']), ingredient_groups)
-                # logging.info(f"第 {suggestion['day']} 天的食材: {day_ingredients}")
-                batch_inputs.append({
-                    'batch_name': f"{suggestion['day']}_{suggestion['meal']}",
-                    'prompt_template': frame_prompt.meal_plan_prompt,
+            
+            # 准备批量处理的输入
+            batch_inputs = [
+                {
+                    'batch_name': f"meal_{suggestion['day']}_{suggestion['meal']}",
+                    'prompt_template': frame_prompt.regenerate_meal_plan_prompt,
                     'invoke_input': {
-                        'analysis_result': analysis_result,
-                        'user_info': user_info,
-                        'day_ingredients': day_ingredients,
-                        'day': int(suggestion['day']),
-                        'meal': suggestion['meal']
+                        "analysis_result": analysis_result,
+                        "user_info": user_info,
+                        "day_ingredients": frame_module.get_ingredients_for_day(weekly_meal_plan, suggestion['day'], ingredient_groups),
+                        "day": suggestion['day'],
+                        "meal": suggestion['meal'],
+                        "previous_meal": json.dumps(next((plan for plan in weekly_meal_plan if plan['day'] == int(suggestion['day']) and plan['meal'] == suggestion['meal']), None)),
+                        "improvement_suggestion": suggestion['suggestion']
                     }
-                })
-            
-            batch_results = await frame_module.batch_async_call_llm(batch_inputs)
-            regeneration_execution_time = time.time() - regeneration_start_time
-            total_regeneration_time += regeneration_execution_time
-            log_module_io(csv_logger, f"FrameModule_Regeneration_Iteration_{iteration_count + 1}", batch_inputs, batch_results, regeneration_execution_time)
-            
-            for batch_name, result in batch_results.items():
-                try:
-                    new_meal_plan = json.loads(result)
-                    logging.info(f"新生成的餐食计划: {new_meal_plan}")
-                    day = int(new_meal_plan.get('day'))  # 确保 day 是整数
-                    meal = new_meal_plan.get('meal')
-                    
-                    if not all([isinstance(day, int), meal, new_meal_plan.get('menu')]):
-                        logging.error(f"新生成的餐食计划格式不正确: {new_meal_plan}")
-                        continue
-                    
+                }
+                for suggestion in improvement_suggestions
+            ]
+
+            # 批量重新生成食谱
+            regenerated_meals = await frame_module.batch_async_call_llm(batch_inputs, parse_json=True)
+
+            # 更新 weekly_meal_plan
+            for batch_name, new_meal_plan in regenerated_meals.items():
+                if new_meal_plan:
+                    day, meal = batch_name.split('_')[1:]
                     for i, plan in enumerate(weekly_meal_plan):
-                        if plan['day'] == day and plan['meal'] == meal:
+                        if plan['day'] == int(day) and plan['meal'] == meal:
                             weekly_meal_plan[i] = new_meal_plan
                             break
                     else:
                         weekly_meal_plan.append(new_meal_plan)
-                    logging.info(f"成功重新生成第 {day} 天的 {meal}")
-                except json.JSONDecodeError:
-                    logging.error(f"重新生成的 {batch_name} 不是有效的JSON格式")
-                except Exception as e:
-                    logging.error(f"处理 {batch_name} 时发生错误: {str(e)}")
+
+            regeneration_execution_time = time.time() - regeneration_start_time
+            total_regeneration_time += regeneration_execution_time
+            log_module_io(csv_logger, f"FrameModule_Regeneration_Iteration_{iteration_count + 1}", improvement_suggestions, weekly_meal_plan, regeneration_execution_time)
 
         iteration_count += 1
 
