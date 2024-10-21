@@ -51,9 +51,9 @@ async def main():
         'analysis_result': analysis_result,
         'user_info': user_info
     }
-    ingredient_input, ingredient_groups, meal_plan_input, weekly_meal_plan = await frame_module.process(frame_input)
+    ingredient_input, ingredient_result, meal_plan_input, weekly_meal_plan = await frame_module.process(frame_input)
     frame_execution_time = time.time() - frame_start_time
-    log_module_io(csv_logger, "FrameModule_IngredientGeneration", ingredient_input, ingredient_groups, frame_execution_time)
+    log_module_io(csv_logger, "FrameModule_IngredientGeneration", ingredient_input, ingredient_result, frame_execution_time)
     log_module_io(csv_logger, "FrameModule_MealPlanGeneration", meal_plan_input, weekly_meal_plan, frame_execution_time)
     logging.info("食谱框架生成完成")
     #################################

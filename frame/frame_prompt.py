@@ -41,7 +41,7 @@ ingredient_generation_prompt = """
   "forbidden_ingredients": ["禁用食材1", "禁用食材2", "..."]
 }}
 
-请确保JSON格式正确并只返回{{}}内的正文内容，不要添加任何额外的文本或解释。特别注意用户的健康状况（如尿酸高）。
+请确保JSON格式正确并只返回{{}}内的正文内容，不要添加任何额外的文本或解释。特别注意用户的健康状况。
 """
 
 meal_plan_prompt = """
@@ -61,22 +61,22 @@ meal_plan_prompt = """
 6.估算每餐的热量。
 请以JSON格式输出结果，结构如下：
 {{
-"day": {day},
-"meal": "{meal}",
-"menu": {{
-"total_calories": "XXKcal",
-"dishes": [
-{{
-"name": "菜品名称",
-"quantity": "份量"
-}},
-{{
-"name": "菜品名称",
-"quantity": "份量"
-}},
-...
-]
-}}
+  "day": {day},
+  "meal": "{meal}",
+  "menu": {{
+    "total_calories": "XXKcal",
+    "dishes": [
+      {{
+        "name": "菜品名称",
+        "quantity": "份量"
+      }},
+      {{
+        "name": "菜品名称",
+        "quantity": "份量"
+      }},
+      ...
+    ]
+  }}
 }}
 
 请确保JSON格式正确并只返回{{}}内的正文内容，不要添加任何额外的文本或解释。每餐的菜品应符合中国传统饮食习惯，同时考虑用户的健康需求。

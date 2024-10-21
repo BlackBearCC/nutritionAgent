@@ -57,17 +57,28 @@ class FrameModule(BaseAgentModule):
 
         results = await self.batch_async_call_llm(batch_inputs)
         
+        logging.info(f"批处理结果: {results}")  # 保留这行日志
+        
         weekly_meal_plan = []
         for batch_name, result in results.items():
+            logging.info(f"处理 {batch_name} 的结果: {result}")  # 保留这行日志
             try:
-                meal_plan = json.loads(result) if isinstance(result, str) else result
+                if result is None:
+                    logging.error(f"{batch_name} 的结果为None")
+                    continue
+                # 移除 ensure_ascii 参数
+                meal_plan = json.loads(result)
                 weekly_meal_plan.append(meal_plan)
-            except json.JSONDecodeError:
-                logging.error(f"{batch_name} 的食谱框架不是有效的JSON格式")
-            except TypeError:
-                logging.error(f"{batch_name} 的结果为None，无法解析为JSON")
-        
+                logging.info(f"成功解析 {batch_name} 的结果")  # 保留这行日志
+            except json.JSONDecodeError as e:
+                logging.error(f"{batch_name} 的食谱框架不是有效的JSON格式: {str(e)}")
+                logging.error(f"原始结果: {result}")
+            except Exception as e:
+                logging.error(f"处理 {batch_name} 时发生错误: {str(e)}")
+                logging.error(f"原始结果: {result}")
+
         logging.info("成功生成7天21餐食谱框架")
+        logging.info(f"weekly_meal_plan: {weekly_meal_plan}")  # 保留这行日志
         
         # 移除 prompt_template，以便日志记录
         batch_inputs_for_log = [{k: v for k, v in input_data.items() if k != 'prompt_template'} for input_data in batch_inputs]
@@ -98,6 +109,7 @@ class FrameModule(BaseAgentModule):
         new_meal_plan = await self.async_call_llm(meal_plan_template, invoke_input, parse_json=True)
         
         try:
+            # 移除 ensure_ascii 参数
             new_meal_plan = json.loads(new_meal_plan) if isinstance(new_meal_plan, str) else new_meal_plan
             for i, plan in enumerate(weekly_meal_plan):
                 if plan['day'] == day and plan['meal'] == meal:
@@ -109,6 +121,7 @@ class FrameModule(BaseAgentModule):
             return new_meal_plan
         except json.JSONDecodeError:
             self.logger.error(f"重新生成的第 {day} 天的 {meal} 不是有效的JSON格式")
+            self.logger.error(f"原始结果: {new_meal_plan}")
             return None
 
     def get_food_database(self):
