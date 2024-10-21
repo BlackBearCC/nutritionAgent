@@ -68,7 +68,7 @@ meal_plan_prompt = """
     "dishes": [
       {{
         "name": "菜品名称",
-        "quantity": "份量"
+        "quantity": "份量（1份/碗..，数量加单位，禁止出现g等称重单位）"
       }},
       {{
         "name": "菜品名称",
@@ -114,7 +114,7 @@ regenerate_meal_plan_prompt = """
     "dishes": [
       {{
         "name": "菜品名称",
-        "quantity": "份量"
+        "quantity": "份量（1份/碗，数量加单位，禁止出现g等称重单位）"
       }},
       {{
         "name": "菜品名称",
@@ -196,7 +196,7 @@ daily_meal_validation_prompt = """
       "dishes": [
         {{
           "name": "菜品名称",
-          "quantity": "份量"
+          "quantity": "份量（1份/碗，数量加单位，禁止出现g等称重单位）"
         }},
         ...
       ]
