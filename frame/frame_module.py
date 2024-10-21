@@ -129,9 +129,12 @@ class FrameModule(BaseAgentModule):
 
     def get_ingredients_for_meal(self, weekly_meal_plan, day, meal):
         day = int(day)
-        meal_ingredients = next((plan['menu']['ingredients'] for plan in weekly_meal_plan if plan['day'] == day and plan['meal'] == meal), [])
-        
+        meal_plan = next((plan for plan in weekly_meal_plan if plan['day'] == day and plan['meal'] == meal), None)
+        if meal_plan:
+            dishes = meal_plan['menu']['dishes']
+            meal_ingredients = [dish['name'] for dish in dishes]
+        else:
+            meal_ingredients = []
         self.logger.info(f"获取第 {day} 天的 {meal} 食材")
         self.logger.info(f"第 {day} 天的 {meal} 食材: {meal_ingredients}")
-        
         return meal_ingredients
