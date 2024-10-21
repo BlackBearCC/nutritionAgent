@@ -26,7 +26,6 @@ logging.basicConfig(
 )
 
 from utils.csv_logger import CSVLogger, log_module_io
-from enrichment.enrichment_module import EnrichmentModule
 
 async def main():
     start_time = time.time()
