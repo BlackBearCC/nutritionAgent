@@ -32,7 +32,7 @@ async def main():
         writer.writerow(["Timestamp", "Module", "Type", "Data"])
 
     user_info = """
-    根据用户标签（女性，35岁，身高160厘米，体重45千克，尿酸高），主诉（降尿酸，美白），"""
+    根据用户标签（女性，35岁，身高160厘米，体重45千克，尿酸高），主诉（降尿酸，美白），喜欢吃川菜"""
     
     logging.info("开始分析用户信息")
     analysis_module = AnalysisModule()
@@ -110,7 +110,6 @@ async def main():
                     'invoke_input': {
                         "analysis_result": analysis_result,
                         "user_info": user_info,
-                        "day_ingredients": frame_module.get_ingredients_for_day(weekly_meal_plan, suggestion['day'], ingredient_groups),
                         "day": suggestion['day'],
                         "meal": suggestion['meal'],
                         "previous_meal": json.dumps(next((plan for plan in weekly_meal_plan if plan['day'] == int(suggestion['day']) and plan['meal'] == suggestion['meal']), None)),

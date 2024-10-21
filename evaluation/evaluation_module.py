@@ -25,7 +25,7 @@ class EvaluationModule(BaseAgentModule):
         else:
             prompt = weekly_meal_evaluation_prompt
         
-        evaluation_result = await self.async_call_llm(prompt, evaluation_input,llm_name="qwen-turbo")
+        evaluation_result = await self.async_call_llm(prompt, evaluation_input,llm_name="qwen-max")
         
         try:
             evaluation = json.loads(evaluation_result)
