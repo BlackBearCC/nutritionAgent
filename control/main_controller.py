@@ -5,8 +5,7 @@ import json
 import csv
 from datetime import datetime
 import time
-
-
+import logging
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
@@ -16,7 +15,6 @@ from generator.generation_module import GenerationModule
 from evaluation.evaluation_module import EvaluationModule
 from utils.generate_user_info import generate_user_info
 from frame import frame_prompt
-import logging
 load_dotenv()
 
 logging.basicConfig(
@@ -95,6 +93,12 @@ async def main():
         evaluation_result = await evaluation_module.process(evaluation_input)
         evaluation_execution_time = time.time() - evaluation_start_time
         total_evaluation_time += evaluation_execution_time
+        
+        if evaluation_result is None:
+            logging.error(f"第 {iteration_count + 1} 次评估失败，跳过本次迭代")
+            iteration_count += 1
+            continue
+        
         log_module_io(csv_logger, f"EvaluationModule_Iteration_{iteration_count + 1}", evaluation_input, evaluation_result, evaluation_execution_time)
         evaluation_history.append(evaluation_result)
 

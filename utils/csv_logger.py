@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Union
 class CSVLogger:
     def __init__(self, file_path: str):
         self.file_path = file_path
-        self.headers = ["Timestamp", "Module", "Type", "Day", "Meal", "Calories", "Dishes"]
+        self.headers = ["Timestamp", "Module", "Type", "Day", "Meal", "Calories", "Dishes", "Introductions"]
         self._initialize_csv()
 
     def _initialize_csv(self):
@@ -31,10 +31,10 @@ class CSVLogger:
             self._log_meal_plan(timestamp, module, data_type, data)
         else:
             formatted_data = self._format_data(data)
-            self._write_row([timestamp, module, data_type, formatted_data, '', '', ''])
+            self._write_row([timestamp, module, data_type, formatted_data, '', '', '', ''])
         
         if execution_time is not None:
-            self._write_row([timestamp, module, 'Execution Time', f"{execution_time:.2f} seconds", '', '', ''])
+            self._write_row([timestamp, module, 'Execution Time', f"{execution_time:.2f} seconds", '', '', '', ''])
         
         self._write_row([])  # 空行分隔不同的日志条目
 
@@ -44,9 +44,16 @@ class CSVLogger:
             meal_type = meal.get('meal', '')
             menu = meal.get('menu', {})
             calories = menu.get('total_calories', '')
-            dishes = '; '.join([f"{dish['name']} ({dish['quantity']})" for dish in menu.get('dishes', [])])
+            dishes = []
+            introductions = []
+            for dish in menu.get('dishes', []):
+                dishes.append(f"{dish['name']} ({dish['quantity']})")
+                introductions.append(dish.get('introduction', 'No introduction available'))
             
-            self._write_row([timestamp, module, data_type, day, meal_type, calories, dishes])
+            dishes_str = '; '.join(dishes)
+            introductions_str = '; '.join(introductions)
+            
+            self._write_row([timestamp, module, data_type, day, meal_type, calories, dishes_str, introductions_str])
 
 def log_module_io(csv_logger: CSVLogger, module_name: str, input_data: Dict[str, Any], output_data: Any, execution_time: float):
     csv_logger.log(module_name, "Input", input_data)
