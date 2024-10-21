@@ -6,12 +6,15 @@ import csv
 from datetime import datetime
 import time
 
+
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 from analyse.analysis_module import AnalysisModule
 from frame.frame_module import FrameModule
 from generator.generation_module import GenerationModule
 from evaluation.evaluation_module import EvaluationModule
+from utils.generate_user_info import generate_user_info
 from frame import frame_prompt
 import logging
 load_dotenv()
@@ -23,6 +26,7 @@ logging.basicConfig(
 )
 
 from utils.csv_logger import CSVLogger, log_module_io
+from enrichment.enrichment_module import EnrichmentModule
 
 async def main():
     start_time = time.time()
@@ -31,17 +35,19 @@ async def main():
         writer = csv.writer(file)
         writer.writerow(["Timestamp", "Module", "Type", "Data"])
 
-    user_info = """
-    根据用户标签（女性，35岁，身高160厘米，体重45千克，尿酸高），主诉（降尿酸，美白），喜欢吃川菜"""
+    user_info = generate_user_info()
     
-    logging.info("开始分析用户信息")
+    logging.info("生成的用户信息:")
+    logging.info(user_info)
+
+    logging.info("开始制定健康目标")
     analysis_module = AnalysisModule()
     analysis_start_time = time.time()
     analysis_input = {'user_info': user_info}
     analysis_result = await analysis_module.process(analysis_input)
     analysis_execution_time = time.time() - analysis_start_time
     log_module_io(csv_logger, "AnalysisModule", analysis_input, analysis_result, analysis_execution_time)
-    logging.info("用户信息分析完成")
+    logging.info("制定健康目标完成")
 
     #################################
     logging.info("开始生成食谱框架")
@@ -150,8 +156,7 @@ async def main():
     log_module_io(csv_logger, "EvaluationHistory", {}, evaluation_history, 0)
     logging.info("评估历史已记录到module_io_log.csv")
 
-    # 最终摘要
-    total_execution_time = time.time() - start_time
+    # 更新最终摘要
     summary = {
         "总迭代次数": iteration_count,
         "最终评分": evaluation_result.get('overall_score', 'N/A'),
@@ -160,15 +165,19 @@ async def main():
         "框架生成耗时": f"{frame_execution_time:.2f}秒",
         "评估总耗时": f"{total_evaluation_time:.2f}秒",
         "重新生成总耗时": f"{total_regeneration_time:.2f}秒",
-        "总耗时": f"{total_execution_time:.2f}秒"
+        "总耗时": f"{(time.time() - start_time):.2f}秒",
     }
-    log_module_io(csv_logger, "FinalSummary", {}, summary, total_execution_time)
+    log_module_io(csv_logger, "FinalSummary", {}, summary, time.time() - start_time)
+
+    # 记录最终的完整7天膳食计划（已包含菜品介绍）
+    log_module_io(csv_logger, "FinalMealPlan", {}, weekly_meal_plan, 0)
+    logging.info("最终的完整7天膳食计划已记录到module_io_log.csv")
 
     logging.info("膳食计划生成和评估过程完成")
     logging.info(f"总迭代次数: {iteration_count}")
     logging.info(f"最终评分: {evaluation_result.get('overall_score', 'N/A')}")
     logging.info(f"最终评价: {evaluation_result.get('general_comments', 'N/A')}")
-    logging.info(f"总耗时: {total_execution_time:.2f}秒")
+    logging.info(f"总耗时: {(time.time() - start_time):.2f}秒")
 
 # 运行异步主函数
 asyncio.run(main())
