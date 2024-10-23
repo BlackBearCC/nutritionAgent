@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # 导入所需的模块
 from analyse.analysis_module import AnalysisModule
@@ -23,30 +23,64 @@ logging.basicConfig(
 app = FastAPI()
 
 class MealPlanRequest(BaseModel):
-    user_info: str
+    userId: int
+    customizedDate: str
+    CC: List[str]
+    sex: str
+    age: int
+    height: str
+    weight: str
+    healthDescription: str
+    mealHabit: str
+    mealAvoid: List[str]
+    mealAllergy: List[str]
+    mealTaste: List[str]
+    mealStaple: List[str]
+    mealSpicy: str
+    mealSoup: str
 
-class Dish(BaseModel):
-    name: str
-    quantity: str
-    introduction: str
+class FoodDetail(BaseModel):
+    foodName: str
+    foodCount: str
+    foodDesc: str
 
-class Menu(BaseModel):
-    total_calories: str
-    dishes: List[Dish]
+class Meal(BaseModel):
+    mealTypeText: str
+    totalEnergy: int
+    foodDetailList: List[FoodDetail]
 
-class MealPlan(BaseModel):
+class DayMeal(BaseModel):
     day: int
-    meal: str
-    menu: Menu
+    meals: List[Meal]
+
+class MealPlanData(BaseModel):
+    id: str
+    foodDate: str
+    record: List[DayMeal]
 
 class MealPlanResponse(BaseModel):
-    weekly_meal_plan: List[MealPlan]
+    code: int
+    msg: str
+    data: MealPlanData
 
 @app.post("/generate_meal_plan", response_model=MealPlanResponse)
 async def generate_meal_plan(request: MealPlanRequest):
     try:
-        # 解析用户信息
-        user_info = request.user_info
+        # 构建用户信息字符串
+        user_info = f"""
+        用户信息：
+        性别：{request.sex}，年龄：{request.age}岁，身高：{request.height}，体重：{request.weight}
+        出生日期：{(datetime.now() - timedelta(days=request.age*365)).strftime('%Y年%m月%d日')}
+        健康兴趣：{', '.join(request.CC)}
+        健康描述：{request.healthDescription}
+        饮食习惯：{request.mealHabit}
+        饮食禁忌：{', '.join(request.mealAvoid) if request.mealAvoid else '无'}
+        食物过敏：{', '.join(request.mealAllergy)}
+        口味偏好：{', '.join(request.mealTaste)}
+        主食偏好：{', '.join(request.mealStaple)}
+        辣度偏好：{request.mealSpicy}
+        喝汤习惯：{request.mealSoup}
+        """
         
         # 初始化模块
         analysis_module = AnalysisModule()
@@ -125,31 +159,53 @@ async def generate_meal_plan(request: MealPlanRequest):
         for meal in weekly_meal_plan:
             processed_dishes = []
             for dish in meal['menu']['dishes']:
-                processed_dish = Dish(
-                    name=dish['name'],
-                    quantity=dish['quantity'],
-                    introduction=dish['introduction']
+                processed_dish = FoodDetail(
+                    foodName=dish['name'],
+                    foodCount=dish['quantity'],
+                    foodDesc=dish['introduction']
                 )
                 processed_dishes.append(processed_dish)
 
-            processed_menu = Menu(
-                total_calories=meal['menu']['total_calories'],
-                dishes=processed_dishes
+            # 处理总热量，确保它是一个整数
+            try:
+                total_energy = int(meal['menu']['total_calories'].replace('Kcal', '').strip())
+            except ValueError:
+                # 如果无法转换为整数，设置一个默认值或估计值
+                total_energy = 0  # 或者其他合适的默认值
+                logging.warning(f"无法解析总热量: {meal['menu']['total_calories']}，使用默认值 {total_energy}")
+
+            processed_meal = Meal(
+                mealTypeText=meal['meal'],
+                totalEnergy=total_energy,
+                foodDetailList=processed_dishes
             )
 
-            processed_meal = MealPlan(
-                day=meal['day'],
-                meal=meal['meal'],
-                menu=processed_menu
-            )
-            processed_meal_plan.append(processed_meal)
+            day_meal = next((dm for dm in processed_meal_plan if dm.day == meal['day']), None)
+            if day_meal:
+                day_meal.meals.append(processed_meal)
+            else:
+                processed_meal_plan.append(DayMeal(day=meal['day'], meals=[processed_meal]))
 
         # 返回处理后的膳食计划
-        return MealPlanResponse(weekly_meal_plan=processed_meal_plan)
+        meal_plan_data = MealPlanData(
+            id=str(request.userId),
+            foodDate=request.customizedDate,
+            record=processed_meal_plan
+        )
+
+        return MealPlanResponse(
+            code=0,
+            msg="成功",
+            data=meal_plan_data
+        )
 
     except Exception as e:
         logging.error(f"生成膳食计划时发生错误: {str(e)}")
-        raise HTTPException(status_code=500, detail="生成膳食计划时发生内部错误")
+        return MealPlanResponse(
+            code=1,
+            msg=f"生成膳食计划时发生内部错误: {str(e)}",
+            data=None
+        )
 
 if __name__ == "__main__":
     import uvicorn

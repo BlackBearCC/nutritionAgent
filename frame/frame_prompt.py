@@ -66,7 +66,7 @@ meal_plan_prompt = """
   "day": {day},
   "meal": "{meal}",
   "menu": {{
-    "total_calories": "XXKcal",
+    "total_calories": "XX（整数类型）",
     "dishes": [
       {{
         "name": "菜品名称",
@@ -116,7 +116,7 @@ regenerate_meal_plan_prompt = """
   "day": {day},
   "meal": "{meal}",
   "menu": {{
-    "total_calories": "XXKcal",
+    "total_calories": "XX（整数类型）",
     "dishes": [
       {{
         "name": "菜品名称",
