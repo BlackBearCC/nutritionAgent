@@ -4,7 +4,7 @@ import json
 import logging
 
 class GenerationModule(BaseAgentModule):
-    
+    """一次生成所有步骤测试"""
     async def process(self, input_data: dict):
         analysis_result = input_data.get('analysis_result')
         user_info = input_data.get('user_info')
