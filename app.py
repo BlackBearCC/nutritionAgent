@@ -63,6 +63,12 @@ class MealPlanResponse(BaseModel):
     msg: str
     data: MealPlanData
 
+class FoodReplaceRequest(BaseModel):
+    id: str
+    replaceFoodList: List[FoodDetail]
+    remainFoodList: List[FoodDetail]
+    mealTypeText: str
+    
 @app.post("/generate_meal_plan", response_model=MealPlanResponse)
 async def generate_meal_plan(request: MealPlanRequest):
     try:
@@ -205,6 +211,81 @@ async def generate_meal_plan(request: MealPlanRequest):
             code=1,
             msg=f"生成膳食计划时发生内部错误: {str(e)}",
             data=None
+        )
+
+@app.post("/replace_foods", response_model=MealPlanResponse)
+async def replace_foods(request: FoodReplaceRequest):
+    try:
+        frame_module = FrameModule()
+        
+        # 构建替换食物的输入
+        replace_input = {
+            'id': request.id,
+            'mealTypeText': request.mealTypeText,
+            'replaceFoodList': [
+                {
+                    'foodName': food.foodName,
+                    'foodCount': food.foodCount,
+                    'foodDesc': food.foodDesc
+                } for food in request.replaceFoodList
+            ],
+            'remainFoodList': [
+                {
+                    'foodName': food.foodName,
+                    'foodCount': food.foodCount,
+                    'foodDesc': food.foodDesc
+                } for food in request.remainFoodList
+            ]
+        }
+        
+        # 调用frame模块的替换功能
+        result = await frame_module.replace_foods(replace_input)
+        
+        if result['code'] != 0:
+            raise HTTPException(status_code=400, detail=result['msg'])
+            
+        # 只返回更换后的食谱
+        meal_data = MealPlanData(
+            id=request.id,
+            foodDate=datetime.now().strftime("%Y-%m-%d"),
+            record=[
+                DayMeal(
+                    day=1,
+                    meals=[
+                        Meal(
+                            mealTypeText=request.mealTypeText,
+                            totalEnergy=result['data']['meals'][0]['totalEnergy'],
+                            # 只包含新生成的食谱
+                            foodDetailList=[
+                                FoodDetail(
+                                    foodName=food['foodName'],
+                                    foodCount=food['foodCount'],
+                                    foodDesc=food['foodDesc']
+                                ) for food in result['data']['meals'][0]['foodDetailList'] 
+                                if food['foodName'] not in [remain_food.foodName for remain_food in request.remainFoodList]
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+        
+        return MealPlanResponse(
+            code=0,
+            msg="成功",
+            data=meal_data
+        )
+        
+    except Exception as e:
+        logging.error(f"更换食物时发生错误: {str(e)}")
+        return MealPlanResponse(
+            code=1,
+            msg=f"更换食物时发生内部错误: {str(e)}",
+            data=MealPlanData(
+                id=request.id,
+                foodDate=datetime.now().strftime("%Y-%m-%d"),
+                record=[]
+            )
         )
 
 if __name__ == "__main__":

@@ -2,6 +2,8 @@ from base.base_agent_module import BaseAgentModule
 from frame import frame_prompt
 import logging
 import json
+import datetime
+
 
 class FrameModule(BaseAgentModule):
     
@@ -138,3 +140,60 @@ class FrameModule(BaseAgentModule):
         self.logger.info(f"获取第 {day} 天的 {meal} 食材")
         self.logger.info(f"第 {day} 天的 {meal} 食材: {meal_ingredients}")
         return meal_ingredients
+
+    async def replace_foods(self, input_data: dict):
+        """处理食物替换请求"""
+        try:
+            # 准备prompt输入
+            prompt_input = {
+                "meal_type": input_data['mealTypeText'],
+                "replace_foods": json.dumps([{
+                    "name": food['foodName'],
+                    "count": food['foodCount'],
+                    "desc": food['foodDesc']
+                } for food in input_data['replaceFoodList']], ensure_ascii=False),
+                "remain_foods": json.dumps([{
+                    "name": food['foodName'],
+                    "count": food['foodCount'],
+                    "desc": food['foodDesc']
+                } for food in input_data['remainFoodList']], ensure_ascii=False)
+            }
+            
+            # 调用LLM生成新的食谱
+            llm_result = await self.async_call_llm(
+                frame_prompt.replace_foods_prompt,
+                prompt_input,
+                llm_name="qwen-turbo",
+                parse_json=True
+            )
+            
+            # 确保llm_result是字典类型
+            if isinstance(llm_result, str):
+                llm_result = json.loads(llm_result)
+                
+            # 只返回新生成的食谱部分
+            return {
+                "code": 0,
+                "msg": "成功",
+                "data": {
+                    "id": input_data['id'],
+                    "foodDate": datetime.datetime.now().strftime("%Y-%m-%d"),
+                    "meals": [{
+                        "mealTypeText": input_data['mealTypeText'],
+                        "totalEnergy": llm_result['total_energy'],
+                        "foodDetailList": llm_result['food_details']  # 只返回新生成的食谱
+                    }]
+                }
+            }
+                
+        except Exception as e:
+            logging.error(f"替换食物时发生错误: {str(e)}")
+            return {
+                "code": 1,
+                "msg": f"替换食物失败: {str(e)}",
+                "data": {
+                    "id": input_data.get('id', ''),
+                    "foodDate": datetime.datetime.now().strftime("%Y-%m-%d"),
+                    "meals": []
+                }
+            }
