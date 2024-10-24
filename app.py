@@ -1,10 +1,16 @@
 import asyncio
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import json
 import logging
 from datetime import datetime, timedelta
+import httpx
+from fastapi.background import BackgroundTasks
+import aiofiles
+import os
+from pathlib import Path
+from openai import OpenAI
 
 # 导入所需的模块
 from analyse.analysis_module import AnalysisModule
@@ -105,8 +111,17 @@ class ReplaceMealPlanResponse(BaseModel):
     msg: str
     data: ReplaceMealPlanData
 
-@app.post("/generate_meal_plan", response_model=GenerateMealPlanResponse)
-async def generate_meal_plan(request: MealPlanRequest):
+# 添加基础响应模型
+class BasicResponse(BaseModel):
+    code: int
+    msg: str
+    data:str
+
+# 添加异步处理任务的函数
+async def process_and_submit_meal_plan(
+    request: MealPlanRequest,
+    submit_url: str
+):
     try:
         # 构建用户信息字符串
         user_info = f"""
@@ -249,38 +264,48 @@ async def generate_meal_plan(request: MealPlanRequest):
         meal_data = GenerateMealPlanData(
             id=str(request.userId),
             foodDate=request.customizedDate,
-            record=[  # 使用 record 和 DayMeal
-                DayMeal(
-                    day=day,
-                    meals=day_meals
-                ) for day, day_meals in meals_by_day.items()
-            ]
+            record=daily_records
         )
         
-        return GenerateMealPlanResponse(
+        result_data = GenerateMealPlanResponse(
             code=0,
             msg="成功",
             data=meal_data
         )
-
+        
+        # 提交结果
+        async with httpx.AsyncClient() as client:
+            response = await client.post(submit_url, json=result_data.dict())
+            response.raise_for_status()
+            logging.info(f"成功提交结果到 {submit_url}")
+            
     except Exception as e:
-        logging.error(f"生成膳食计划时发生错误: {str(e)}")
-        return GenerateMealPlanResponse(
-            code=1,
-            msg=f"生成膳食计划时发生内部错误: {str(e)}",
-            data=GenerateMealPlanData(
-                id=str(request.userId),
-                foodDate=request.customizedDate,
-                record=[]
-            )
-        )
+        logging.error(f"后台处理任务发生错误: {str(e)}")
+        # 这里可以添加错误处理的逻辑，比如重试或通知
 
-@app.post("/replace_foods", response_model=ReplaceMealPlanResponse)
-async def replace_foods(request: FoodReplaceRequest):
+# 修改生成食谱接口
+@app.post("/generate_meal_plan", response_model=BasicResponse)
+async def generate_meal_plan(
+    request: MealPlanRequest,
+    background_tasks: BackgroundTasks
+):
+    # 立即返回成功响应
+    background_tasks.add_task(
+        process_and_submit_meal_plan,
+        request,
+        "http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedResult"
+    )
+    return BasicResponse(code=0, msg="成功",data="")
+
+# 替换食材的后台处理函数
+async def process_and_submit_replacement(
+    request: FoodReplaceRequest,
+    submit_url: str
+):
     try:
         # 构建用户信息字符串
         user_info = f"""
-        用户信息：
+        户信息：
         性别：{request.sex}，年龄：{request.age}岁，身高：{request.height}，体重：{request.weight}
         健康兴趣：{', '.join(request.CC)}
         健康描述：{request.healthDescription}
@@ -343,22 +368,199 @@ async def replace_foods(request: FoodReplaceRequest):
             ]
         )
         
-        return ReplaceMealPlanResponse(
+        result_data = ReplaceMealPlanResponse(
             code=0,
             msg="成功",
             data=meal_data
         )
         
+        # 提交结果
+        async with httpx.AsyncClient() as client:
+            response = await client.post(submit_url, json=result_data.dict())
+            response.raise_for_status()
+            logging.info(f"成功提交换结果到 {submit_url}")
+            
     except Exception as e:
-        logging.error(f"更换食物时发生错误: {str(e)}")
-        return ReplaceMealPlanResponse(
-            code=1,
-            msg=f"更换食物时发生内部错误: {str(e)}",
-            data=ReplaceMealPlanData(
-                id=request.id,
-                foodDate=datetime.now().strftime("%Y-%m-%d"),
-                meals=[]
+        logging.error(f"后台处理替换任务发生错误: {str(e)}")
+
+# 修改替换食材接口
+@app.post("/replace_foods", response_model=BasicResponse)
+async def replace_foods(
+    request: FoodReplaceRequest,
+    background_tasks: BackgroundTasks
+):
+    # 立即返回成功响应
+    background_tasks.add_task(
+        process_and_submit_replacement,
+        request,
+        "http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedReplace"
+    )
+    return BasicResponse(code=0, msg="成功",data="")
+
+# 添加文件上传处理的响应模型
+class HealthReportResponse(BaseModel):
+    code: int
+    msg: str
+    data: str
+
+# 添加文件上传和解析的后台处理函数
+async def process_and_submit_health_report(
+    file: UploadFile,
+    submit_url: str
+):
+    try:
+        # 创建临时文件夹用于存储上传的文件
+        temp_dir = "temp_uploads"
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        file_path = os.path.join(temp_dir, file.filename)
+        
+        # 异步保存上传的文件
+        async with aiofiles.open(file_path, 'wb') as out_file:
+            content = await file.read()
+            await out_file.write(content)
+            
+        # 初始化 Moonshot 客户端
+        client = OpenAI(
+            api_key="sk-UNC90F5elMVhBc89xlhWCWPsKpicRwhh986pYJfH4jXK6Ba6",
+            base_url="https://api.moonshot.cn/v1",
+        )
+        
+        # 上传文件
+        with open(file_path, 'rb') as f:
+            file_object = client.files.create(
+                file=Path(file_path), 
+                purpose="file-extract"
             )
+        
+        # 获取文件内容
+        file_content = client.files.content(file_id=file_object.id).text
+        
+        # 构建对话
+        messages = [
+            {
+                "role": "system",
+                "content": "你是一个专业的健康报告分析助手。请分析这份健康体检报告，提取关键信息并给出健康建议。",
+            },
+            {
+                "role": "system",
+                "content": file_content,
+            },
+            {
+                "role": "user", 
+                "content": "请分析这份体检报告的主要问题和健康建议"
+            },
+        ]
+        
+        # 调用 chat-completion
+        completion = client.chat.completions.create(
+            model="moonshot-v1-32k",
+            messages=messages,
+            temperature=0.3,
+        )
+        
+        # 获取分析结果
+        analysis_result = completion.choices[0].message.content
+        
+        # 提交解析结果
+        result_data = {
+            'code': 0,
+            'msg': '成功',
+            'data': analysis_result
+        }
+        
+        await client.post(submit_url, json=result_data)
+        logging.info(f"成功提交健康报告解析结果到 {submit_url}")
+        
+        # 清理临时文件
+        os.remove(file_path)
+            
+    except Exception as e:
+        logging.error(f"处理健康报告时发生错误: {str(e)}")
+        # 确保清理临时文件
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+# 修改健康报告解析接口
+@app.post("/parse_health_report", response_model=HealthReportResponse)
+async def parse_health_report(
+    file: UploadFile = File(...)
+):
+    try:
+        if not file.filename.endswith(('.pdf', '.doc', '.docx')):
+            return HealthReportResponse(code=1, msg="仅支持 PDF 和 Word 文档格式", data="")
+            
+        # 创建临时文件夹用于存储上传的文件
+        temp_dir = "temp_uploads"
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        file_path = os.path.join(temp_dir, file.filename)
+        
+        try:
+            # 异步保存上传的文件
+            async with aiofiles.open(file_path, 'wb') as out_file:
+                content = await file.read()
+                await out_file.write(content)
+            
+            # 初始化 Moonshot 客户端
+            client = OpenAI(
+                api_key="sk-UNC90F5elMVhBc89xlhWCWPsKpicRwhh986pYJfH4jXK6Ba6",
+                base_url="https://api.moonshot.cn/v1",
+            )
+            
+            # 上传文件
+            with open(file_path, 'rb') as f:
+                file_object = client.files.create(
+                    file=Path(file_path), 
+                    purpose="file-extract"
+                )
+            
+            # 获取文件内容
+            file_content = client.files.content(file_id=file_object.id).text
+            
+            # 构建对话
+            messages = [
+                {
+                    "role": "system",
+                    "content": "你是一个专业的健康报告分析助手。请分析这份健康体检报告，提取关键信息并给出健康建议。",
+                },
+                {
+                    "role": "system",
+                    "content": file_content,
+                },
+                {
+                    "role": "user", 
+                    "content": "请分析这份体检报告的主要问题和健康建议"
+                },
+            ]
+            
+            # 调用 chat-completion
+            completion = client.chat.completions.create(
+                model="moonshot-v1-32k",
+                messages=messages,
+                temperature=0.3,
+            )
+            
+            # 获取分析结果
+            analysis_result = completion.choices[0].message.content
+            
+            return HealthReportResponse(
+                code=0,
+                msg="成功",
+                data=analysis_result
+            )
+                
+        finally:
+            # 确保清理临时文件
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                
+    except Exception as e:
+        logging.error(f"处理健康报告时发生错误: {str(e)}")
+        return HealthReportResponse(
+            code=1, 
+            msg=f"处理失败: {str(e)}", 
+            data=""
         )
 
 if __name__ == "__main__":
