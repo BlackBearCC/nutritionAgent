@@ -3,6 +3,7 @@ version: '3.8'
 services:
   nutrition-agent:
     build: .
+    image: registry.cn-hangzhou.aliyuncs.com/big-head/nutrition_agent:latest 
     container_name: nutrition-agent
     ports:
       - "8000:8000"
