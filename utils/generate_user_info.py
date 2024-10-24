@@ -3,10 +3,10 @@ from datetime import datetime, timedelta
 
 def generate_user_info():
     # 身高
-    height = random.randint(100, 230)
+    height = random.randint(140, 190)
     
     # 体重
-    weight = round(random.uniform(25, 200), 1)
+    weight = round(random.uniform(50, 200), 1)
     
     # 性别
     gender = random.choice(['男', '女'])
