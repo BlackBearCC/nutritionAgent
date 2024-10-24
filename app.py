@@ -116,6 +116,22 @@ class BasicResponse(BaseModel):
     code: int
     msg: str
     data:str
+# 请求模型
+class PdfAnalysisRequest(BaseModel):
+    id: str
+    pdfUrl: str
+
+# 响应数据模型
+class PdfAnalysisData(BaseModel):
+    id: str
+    pdfAnalysis: str
+
+# 响应模型
+class PdfAnalysisResponse(BaseModel):
+    code: int
+    msg: str
+    data: PdfAnalysisData
+
 
 # 添加异步处理任务的函数
 async def process_and_submit_meal_plan(
@@ -389,7 +405,7 @@ async def replace_foods(
     request: FoodReplaceRequest,
     background_tasks: BackgroundTasks
 ):
-    # 立即返回成功响应
+    # 立即返回成功��应
     background_tasks.add_task(
         process_and_submit_replacement,
         request,
@@ -522,7 +538,18 @@ async def parse_health_report(
             messages = [
                 {
                     "role": "system",
-                    "content": "你是一个专业的健康报告分析助手。请分析这份健康体检报告，提取关键信息并给出健康建议。",
+                    "content": """你是一个专业的健康报告分析助手。请生成此体检报告的健康问题总结，字数在150字以内，
+                                ##要求##
+                                1.不要提及人名
+                                2.语言简明扼要，直接总结结论
+                                3.仅输出异常项，正常项不需要输出
+                                4.不输出多余解释和说明。
+                                5.如果没有异常问题，直接输出”体检报告无异常“
+                                6.不要遗漏健康问题和异常项
+
+                                ##输出示例##
+                                示例一：体检报告无异常。
+                                示例二：存在电轴右偏、左侧小脑后下动脉血流速度增快、颈椎生理曲度变直、右肺微小结节等问题。""",
                 },
                 {
                     "role": "system",
@@ -530,7 +557,7 @@ async def parse_health_report(
                 },
                 {
                     "role": "user", 
-                    "content": "请分析这份体检报告的主要问题和健康建议"
+                    "content": "请按要求分析这份报告"
                 },
             ]
             
@@ -561,6 +588,75 @@ async def parse_health_report(
             code=1, 
             msg=f"处理失败: {str(e)}", 
             data=""
+        )
+
+
+
+@app.post("/analyze_pdf", response_model=PdfAnalysisResponse)
+async def analyze_pdf(request: PdfAnalysisRequest):
+    try:
+        # 初始化 Moonshot 客户端
+        client = OpenAI(
+            api_key="sk-UNC90F5elMVhBc89xlhWCWPsKpicRwhh986pYJfH4jXK6Ba6",
+            base_url="https://api.moonshot.cn/v1",
+        )
+        
+        # 构建对话
+        messages = [
+            {
+                "role": "system",
+                "content": """你是一个专业的健康报告分析助手。请生成此体检报告的健康问题总结，字数在150字以内，
+                            ##要求##
+                            1.不要提及人名
+                            2.语言简明扼要，直接总结结论
+                            3.仅输出异常项，正常项不需要输出
+                            4.不输出多余解释和说明。
+                            5.如果没有异常问题，直接输出"体检报告无异常"
+                            6.不要遗漏健康问题和异常项
+
+                            ##输出示例##
+                            示例一：体检报告无异常。
+                            示例二：存在电轴右偏、左侧小脑后下动脉血流速度增快、颈椎生理曲度变直、右肺微小结节等问题。""",
+            },
+            {
+                "role": "system",
+                "content": request.pdfUrl,  # 直接传入PDF的URL
+            },
+            {
+                "role": "user", 
+                "content": "请仔细分析报告，100-150字"
+            },
+        ]
+        
+        # 调用 chat-completion
+        completion = client.chat.completions.create(
+            model="moonshot-v1-32k",
+            messages=messages,
+            temperature=0.7,
+        )
+        
+        # 获取分析结果
+        analysis_result = completion.choices[0].message.content
+        
+        # 构建响应
+        return PdfAnalysisResponse(
+            code=0,
+            msg="成功",
+            data=PdfAnalysisData(
+                id=request.id,
+                pdfAnalysis=analysis_result
+            )
+        )
+        
+    except Exception as e:
+        logging.error(f"处理PDF分析请求时发生错误: {str(e)}")
+        return PdfAnalysisResponse(
+            code=1,
+            msg=f"处理失败: {str(e)}",
+            data=PdfAnalysisData(
+                id=request.id,
+                pdfAnalysis=""
+            )
         )
 
 if __name__ == "__main__":
