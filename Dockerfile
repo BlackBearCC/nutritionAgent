@@ -1,18 +1,13 @@
-FROM python:3.9
+FROM registry.cn-hangzhou.aliyuncs.com/big-head/nutrition_agent:latest
 
 WORKDIR /app
 
-# 安装系统依赖
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# 只复制更新的文件
+COPY ./app.py .
+# COPY ./其他更新的文件 .
 
-
-# 复制项目文件
-COPY . .
-
-# 安装Python依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# 如果有新的依赖，可以追加安装
+# RUN pip install --no-cache-dir 新的包名
 
 # 暴露端口
 EXPOSE 8000

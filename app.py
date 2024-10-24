@@ -23,7 +23,7 @@ logging.basicConfig(
 app = FastAPI()
 
 class MealPlanRequest(BaseModel):
-    userId: int
+    userId: str
     customizedDate: str
     CC: List[str]
     sex: str
@@ -40,10 +40,10 @@ class MealPlanRequest(BaseModel):
     mealSoup: str
 
 class FoodDetail(BaseModel):
-    customizedId: Optional[int] = None
     foodName: str
     foodCount: str
     foodDesc: str
+    customizedId: Optional[int] = None
 
 class Meal(BaseModel):
     mealTypeText: str
@@ -57,7 +57,7 @@ class DayMeal(BaseModel):
 class MealPlanData(BaseModel):
     id: str
     foodDate: str
-    meals: List[Meal]  # 改为 meals 而不是 record
+    meals: List[Meal]  # 直接使用 meals，不需要 record 和 DayMeal
 
 class MealPlanResponse(BaseModel):
     code: int
@@ -83,7 +83,29 @@ class FoodReplaceRequest(BaseModel):
     replaceFoodList: List[FoodDetail]
     remainFoodList: List[FoodDetail]
 
-@app.post("/generate_meal_plan", response_model=MealPlanResponse)
+# 生成食谱用的模型
+class GenerateMealPlanData(BaseModel):
+    id: str
+    foodDate: str
+    record: List[DayMeal]  # 使用 record 和 DayMeal
+
+class GenerateMealPlanResponse(BaseModel):
+    code: int
+    msg: str
+    data: GenerateMealPlanData
+
+# 替换食材用的模型
+class ReplaceMealPlanData(BaseModel):
+    id: str
+    foodDate: str
+    meals: List[Meal]  # 直接使用 meals
+
+class ReplaceMealPlanResponse(BaseModel):
+    code: int
+    msg: str
+    data: ReplaceMealPlanData
+
+@app.post("/generate_meal_plan", response_model=GenerateMealPlanResponse)
 async def generate_meal_plan(request: MealPlanRequest):
     try:
         # 构建用户信息字符串
@@ -174,9 +196,13 @@ async def generate_meal_plan(request: MealPlanRequest):
 
             iteration_count += 1
 
-        # 处理返回的数据，确保包含完整的食谱信息
-        processed_meal_plan = []
+        # 按天组织数据
+        meals_by_day = {}
         for meal in weekly_meal_plan:
+            day = int(meal['day'])
+            if day not in meals_by_day:
+                meals_by_day[day] = []
+            
             processed_dishes = []
             for dish in meal['menu']['dishes']:
                 processed_dish = FoodDetail(
@@ -186,48 +212,70 @@ async def generate_meal_plan(request: MealPlanRequest):
                 )
                 processed_dishes.append(processed_dish)
 
-            # 处理总热量，确保它是一个整数
+            # 修改这部分热量处理逻辑
             try:
-                total_energy = int(meal['menu']['total_calories'].replace('Kcal', '').strip())
-            except ValueError:
-                # 如果无法转换为整数，设置一个默认值或估计值
-                total_energy = 0  # 或者其他合适的默认值
-                logging.warning(f"无法解析总热量: {meal['menu']['total_calories']}，使用默认值 {total_energy}")
+                total_calories = meal['menu']['total_calories']
+                if isinstance(total_calories, str):
+                    # 如果是字符串，尝试清理并转换
+                    total_energy = int(total_calories.replace('Kcal', '').replace('kcal', '').strip())
+                elif isinstance(total_calories, (int, float)):
+                    # 如果已经是数字，直接使用
+                    total_energy = int(total_calories)
+                else:
+                    # 其他情况使用默认值
+                    total_energy = 0
+                    logging.warning(f"无法识别的热量格式: {total_calories}，使用默认值 {total_energy}")
+            except (ValueError, AttributeError) as e:
+                total_energy = 0
+                logging.warning(f"处理热量值时出错: {str(e)}，使用默认值 {total_energy}")
 
             processed_meal = Meal(
                 mealTypeText=meal['meal'],
                 totalEnergy=total_energy,
                 foodDetailList=processed_dishes
             )
+            meals_by_day[day].append(processed_meal)
 
-            day_meal = next((dm for dm in processed_meal_plan if dm.day == meal['day']), None)
-            if day_meal:
-                day_meal.meals.append(processed_meal)
-            else:
-                processed_meal_plan.append(DayMeal(day=meal['day'], meals=[processed_meal]))
+        # 构建每天的记录
+        daily_records = []
+        for day, meals in meals_by_day.items():
+            daily_record = DayMeal(
+                day=day,
+                meals=meals
+            )
+            daily_records.append(daily_record)
 
-        # 返回处理后的膳食计划
-        meal_plan_data = MealPlanData(
+        # 使用 GenerateMealPlanData
+        meal_data = GenerateMealPlanData(
             id=str(request.userId),
             foodDate=request.customizedDate,
-            meals=processed_meal_plan
+            record=[  # 使用 record 和 DayMeal
+                DayMeal(
+                    day=day,
+                    meals=day_meals
+                ) for day, day_meals in meals_by_day.items()
+            ]
         )
-
-        return MealPlanResponse(
+        
+        return GenerateMealPlanResponse(
             code=0,
             msg="成功",
-            data=meal_plan_data
+            data=meal_data
         )
 
     except Exception as e:
         logging.error(f"生成膳食计划时发生错误: {str(e)}")
-        return MealPlanResponse(
+        return GenerateMealPlanResponse(
             code=1,
             msg=f"生成膳食计划时发生内部错误: {str(e)}",
-            data=None
+            data=GenerateMealPlanData(
+                id=str(request.userId),
+                foodDate=request.customizedDate,
+                record=[]
+            )
         )
 
-@app.post("/replace_foods", response_model=MealPlanResponse)
+@app.post("/replace_foods", response_model=ReplaceMealPlanResponse)
 async def replace_foods(request: FoodReplaceRequest):
     try:
         # 构建用户信息字符串
@@ -275,17 +323,17 @@ async def replace_foods(request: FoodReplaceRequest):
         if result['code'] != 0:
             raise HTTPException(status_code=400, detail=result['msg'])
             
-        # 修改返回格式
-        meal_data = MealPlanData(
+        # 使用 ReplaceMealPlanData
+        meal_data = ReplaceMealPlanData(
             id=request.id,
             foodDate=datetime.now().strftime("%Y-%m-%d"),
-            meals=[  # 直接使用 meals 而不是 record
+            meals=[  # 直接使用 meals
                 Meal(
                     mealTypeText=request.mealTypeText,
                     totalEnergy=result['data']['meals'][0]['totalEnergy'],
                     foodDetailList=[
                         FoodDetail(
-                            customizedId=food.get('customizedId'),  # 确保包含 customizedId
+                            customizedId=food.get('customizedId'),
                             foodName=food['foodName'],
                             foodCount=food['foodCount'],
                             foodDesc=food['foodDesc']
@@ -295,7 +343,7 @@ async def replace_foods(request: FoodReplaceRequest):
             ]
         )
         
-        return MealPlanResponse(
+        return ReplaceMealPlanResponse(
             code=0,
             msg="成功",
             data=meal_data
@@ -303,13 +351,13 @@ async def replace_foods(request: FoodReplaceRequest):
         
     except Exception as e:
         logging.error(f"更换食物时发生错误: {str(e)}")
-        return MealPlanResponse(
+        return ReplaceMealPlanResponse(
             code=1,
             msg=f"更换食物时发生内部错误: {str(e)}",
-            data=MealPlanData(
+            data=ReplaceMealPlanData(
                 id=request.id,
                 foodDate=datetime.now().strftime("%Y-%m-%d"),
-                meals=[]  # 这里也改为 meals
+                meals=[]
             )
         )
 
