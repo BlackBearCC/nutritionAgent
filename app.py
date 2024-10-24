@@ -7,9 +7,7 @@ import logging
 from datetime import datetime, timedelta
 import httpx
 from fastapi.background import BackgroundTasks
-import aiofiles
-import os
-from pathlib import Path
+
 from openai import OpenAI
 
 # 导入所需的模块
@@ -405,7 +403,7 @@ async def replace_foods(
     request: FoodReplaceRequest,
     background_tasks: BackgroundTasks
 ):
-    # 立即返回成功��应
+    # 立即返回成功响应
     background_tasks.add_task(
         process_and_submit_replacement,
         request,
@@ -413,182 +411,7 @@ async def replace_foods(
     )
     return BasicResponse(code=0, msg="成功",data="")
 
-# 添加文件上传处理的响应模型
-class HealthReportResponse(BaseModel):
-    code: int
-    msg: str
-    data: str
 
-# 添加文件上传和解析的后台处理函数
-async def process_and_submit_health_report(
-    file: UploadFile,
-    submit_url: str
-):
-    try:
-        # 创建临时文件夹用于存储上传的文件
-        temp_dir = "temp_uploads"
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        file_path = os.path.join(temp_dir, file.filename)
-        
-        # 异步保存上传的文件
-        async with aiofiles.open(file_path, 'wb') as out_file:
-            content = await file.read()
-            await out_file.write(content)
-            
-        # 初始化 Moonshot 客户端
-        client = OpenAI(
-            api_key="sk-UNC90F5elMVhBc89xlhWCWPsKpicRwhh986pYJfH4jXK6Ba6",
-            base_url="https://api.moonshot.cn/v1",
-        )
-        
-        # 上传文件
-        with open(file_path, 'rb') as f:
-            file_object = client.files.create(
-                file=Path(file_path), 
-                purpose="file-extract"
-            )
-        
-        # 获取文件内容
-        file_content = client.files.content(file_id=file_object.id).text
-        
-        # 构建对话
-        messages = [
-            {
-                "role": "system",
-                "content": "你是一个专业的健康报告分析助手。请分析这份健康体检报告，提取关键信息并给出健康建议。",
-            },
-            {
-                "role": "system",
-                "content": file_content,
-            },
-            {
-                "role": "user", 
-                "content": "请分析这份体检报告的主要问题和健康建议"
-            },
-        ]
-        
-        # 调用 chat-completion
-        completion = client.chat.completions.create(
-            model="moonshot-v1-32k",
-            messages=messages,
-            temperature=0.3,
-        )
-        
-        # 获取分析结果
-        analysis_result = completion.choices[0].message.content
-        
-        # 提交解析结果
-        result_data = {
-            'code': 0,
-            'msg': '成功',
-            'data': analysis_result
-        }
-        
-        await client.post(submit_url, json=result_data)
-        logging.info(f"成功提交健康报告解析结果到 {submit_url}")
-        
-        # 清理临时文件
-        os.remove(file_path)
-            
-    except Exception as e:
-        logging.error(f"处理健康报告时发生错误: {str(e)}")
-        # 确保清理临时文件
-        if os.path.exists(file_path):
-            os.remove(file_path)
-
-# 修改健康报告解析接口
-@app.post("/parse_health_report", response_model=HealthReportResponse)
-async def parse_health_report(
-    file: UploadFile = File(...)
-):
-    try:
-        if not file.filename.endswith(('.pdf', '.doc', '.docx')):
-            return HealthReportResponse(code=1, msg="仅支持 PDF 和 Word 文档格式", data="")
-            
-        # 创建临时文件夹用于存储上传的文件
-        temp_dir = "temp_uploads"
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        file_path = os.path.join(temp_dir, file.filename)
-        
-        try:
-            # 异步保存上传的文件
-            async with aiofiles.open(file_path, 'wb') as out_file:
-                content = await file.read()
-                await out_file.write(content)
-            
-            # 初始化 Moonshot 客户端
-            client = OpenAI(
-                api_key="sk-UNC90F5elMVhBc89xlhWCWPsKpicRwhh986pYJfH4jXK6Ba6",
-                base_url="https://api.moonshot.cn/v1",
-            )
-            
-            # 上传文件
-            with open(file_path, 'rb') as f:
-                file_object = client.files.create(
-                    file=Path(file_path), 
-                    purpose="file-extract"
-                )
-            
-            # 获取文件内容
-            file_content = client.files.content(file_id=file_object.id).text
-            
-            # 构建对话
-            messages = [
-                {
-                    "role": "system",
-                    "content": """你是一个专业的健康报告分析助手。请生成此体检报告的健康问题总结，字数在150字以内，
-                                ##要求##
-                                1.不要提及人名
-                                2.语言简明扼要，直接总结结论
-                                3.仅输出异常项，正常项不需要输出
-                                4.不输出多余解释和说明。
-                                5.如果没有异常问题，直接输出”体检报告无异常“
-                                6.不要遗漏健康问题和异常项
-
-                                ##输出示例##
-                                示例一：体检报告无异常。
-                                示例二：存在电轴右偏、左侧小脑后下动脉血流速度增快、颈椎生理曲度变直、右肺微小结节等问题。""",
-                },
-                {
-                    "role": "system",
-                    "content": file_content,
-                },
-                {
-                    "role": "user", 
-                    "content": "请按要求分析这份报告"
-                },
-            ]
-            
-            # 调用 chat-completion
-            completion = client.chat.completions.create(
-                model="moonshot-v1-32k",
-                messages=messages,
-                temperature=0.3,
-            )
-            
-            # 获取分析结果
-            analysis_result = completion.choices[0].message.content
-            
-            return HealthReportResponse(
-                code=0,
-                msg="成功",
-                data=analysis_result
-            )
-                
-        finally:
-            # 确保清理临时文件
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                
-    except Exception as e:
-        logging.error(f"处理健康报告时发生错误: {str(e)}")
-        return HealthReportResponse(
-            code=1, 
-            msg=f"处理失败: {str(e)}", 
-            data=""
-        )
 
 
 

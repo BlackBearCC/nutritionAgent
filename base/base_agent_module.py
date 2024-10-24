@@ -25,35 +25,27 @@ class BaseAgentModule(ABC):
     async def process(self, input_data: dict):
         pass
     
-    async def async_call_llm(self, prompt_template, invoke_input: dict, llm_name="qwen-turbo", output_schema: Type[BaseModel] = None, **kwargs):
+    async def async_call_llm(self, prompt_template, invoke_input: dict, llm_name="qwen-turbo", parse_json=False, **kwargs):
         llm = Tongyi(model_name=llm_name, temperature=0.7, top_k=100, top_p=0.9, dashscope_api_key=self.llm_api_key)
         prompt_text = self.generate_prompt_text(prompt_template, **kwargs)
         prompt = PromptTemplate(template=prompt_text, input_variables=invoke_input.keys())
-        
-        if output_schema:
-            output_parser = JsonOutputParser(pydantic_object=output_schema)
-        else:
-            output_parser = JsonOutputParser()
-        
-        retry_parser = RetryWithErrorOutputParser.from_llm(
-            parser=output_parser,
-            llm=llm,
-            max_retries=3,
-            on_retry_func=self.on_retry
-        )
-        
-        chain = prompt | llm | retry_parser
-        
+        output_parser = StrOutputParser()
+        chain = prompt | llm | output_parser
         try:
             response = await chain.ainvoke(invoke_input)
-            self.logger.info(f"Response: {response}")
+            logging.info(f"Response: {response}")
+            if parse_json:
+                return self.parse_json_response(response)
+            return response
+        except RateLimitError:
+            logging.error("Rate limit reached, retrying...")
+            response = await self.retry_chain(chain, kwargs)
+            if parse_json:
+                return self.parse_json_response(response)
             return response
         except Exception as e:
-            self.logger.error(f"Unexpected error occurred: {e}")
+            logging.error(f"Unexpected error occurred: {e}")
             raise e
-
-    def on_retry(self, error):
-        self.logger.warning(f"Retrying due to error: {error}")
 
     def generate_prompt_text(self, prompt_template, **kwargs):
         for key, value in kwargs.items():
