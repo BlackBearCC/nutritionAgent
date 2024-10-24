@@ -40,6 +40,7 @@ class MealPlanRequest(BaseModel):
     mealSoup: str
 
 class FoodDetail(BaseModel):
+    customizedId: Optional[int] = None
     foodName: str
     foodCount: str
     foodDesc: str
@@ -56,7 +57,7 @@ class DayMeal(BaseModel):
 class MealPlanData(BaseModel):
     id: str
     foodDate: str
-    record: List[DayMeal]
+    meals: List[Meal]  # 改为 meals 而不是 record
 
 class MealPlanResponse(BaseModel):
     code: int
@@ -65,10 +66,23 @@ class MealPlanResponse(BaseModel):
 
 class FoodReplaceRequest(BaseModel):
     id: str
+    CC: List[str]
+    sex: str
+    age: int
+    height: str
+    weight: str
+    healthDescription: str
+    mealHabit: str
+    mealAvoid: List[str]
+    mealAllergy: List[str]
+    mealTaste: List[str]
+    mealStaple: List[str]
+    mealSpicy: str
+    mealSoup: str
+    mealTypeText: str
     replaceFoodList: List[FoodDetail]
     remainFoodList: List[FoodDetail]
-    mealTypeText: str
-    
+
 @app.post("/generate_meal_plan", response_model=MealPlanResponse)
 async def generate_meal_plan(request: MealPlanRequest):
     try:
@@ -196,7 +210,7 @@ async def generate_meal_plan(request: MealPlanRequest):
         meal_plan_data = MealPlanData(
             id=str(request.userId),
             foodDate=request.customizedDate,
-            record=processed_meal_plan
+            meals=processed_meal_plan
         )
 
         return MealPlanResponse(
@@ -216,17 +230,34 @@ async def generate_meal_plan(request: MealPlanRequest):
 @app.post("/replace_foods", response_model=MealPlanResponse)
 async def replace_foods(request: FoodReplaceRequest):
     try:
+        # 构建用户信息字符串
+        user_info = f"""
+        用户信息：
+        性别：{request.sex}，年龄：{request.age}岁，身高：{request.height}，体重：{request.weight}
+        健康兴趣：{', '.join(request.CC)}
+        健康描述：{request.healthDescription}
+        饮食习惯：{request.mealHabit}
+        饮食禁忌：{', '.join(request.mealAvoid) if request.mealAvoid else '无'}
+        食物过敏：{', '.join(request.mealAllergy)}
+        口味偏好：{', '.join(request.mealTaste)}
+        主食偏好：{', '.join(request.mealStaple)}
+        辣度偏好：{request.mealSpicy}
+        喝汤习惯：{request.mealSoup}
+        """
+        
         frame_module = FrameModule()
         
         # 构建替换食物的输入
         replace_input = {
             'id': request.id,
             'mealTypeText': request.mealTypeText,
+            'user_info': user_info,  # 添加用户信息
             'replaceFoodList': [
                 {
                     'foodName': food.foodName,
                     'foodCount': food.foodCount,
-                    'foodDesc': food.foodDesc
+                    'foodDesc': food.foodDesc,
+                    'customizedId': food.customizedId
                 } for food in request.replaceFoodList
             ],
             'remainFoodList': [
@@ -244,27 +275,21 @@ async def replace_foods(request: FoodReplaceRequest):
         if result['code'] != 0:
             raise HTTPException(status_code=400, detail=result['msg'])
             
-        # 只返回更换后的食谱
+        # 修改返回格式
         meal_data = MealPlanData(
             id=request.id,
             foodDate=datetime.now().strftime("%Y-%m-%d"),
-            record=[
-                DayMeal(
-                    day=1,
-                    meals=[
-                        Meal(
-                            mealTypeText=request.mealTypeText,
-                            totalEnergy=result['data']['meals'][0]['totalEnergy'],
-                            # 只包含新生成的食谱
-                            foodDetailList=[
-                                FoodDetail(
-                                    foodName=food['foodName'],
-                                    foodCount=food['foodCount'],
-                                    foodDesc=food['foodDesc']
-                                ) for food in result['data']['meals'][0]['foodDetailList'] 
-                                if food['foodName'] not in [remain_food.foodName for remain_food in request.remainFoodList]
-                            ]
-                        )
+            meals=[  # 直接使用 meals 而不是 record
+                Meal(
+                    mealTypeText=request.mealTypeText,
+                    totalEnergy=result['data']['meals'][0]['totalEnergy'],
+                    foodDetailList=[
+                        FoodDetail(
+                            customizedId=food.get('customizedId'),  # 确保包含 customizedId
+                            foodName=food['foodName'],
+                            foodCount=food['foodCount'],
+                            foodDesc=food['foodDesc']
+                        ) for food in result['data']['meals'][0]['foodDetailList']
                     ]
                 )
             ]
@@ -284,7 +309,7 @@ async def replace_foods(request: FoodReplaceRequest):
             data=MealPlanData(
                 id=request.id,
                 foodDate=datetime.now().strftime("%Y-%m-%d"),
-                record=[]
+                meals=[]  # 这里也改为 meals
             )
         )
 

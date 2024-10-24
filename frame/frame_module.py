@@ -147,10 +147,12 @@ class FrameModule(BaseAgentModule):
             # 准备prompt输入
             prompt_input = {
                 "meal_type": input_data['mealTypeText'],
+                "user_info": input_data['user_info'],
                 "replace_foods": json.dumps([{
                     "name": food['foodName'],
                     "count": food['foodCount'],
-                    "desc": food['foodDesc']
+                    "desc": food['foodDesc'],
+                    "customizedId": food.get('customizedId')  # 确保customizedId被传递
                 } for food in input_data['replaceFoodList']], ensure_ascii=False),
                 "remain_foods": json.dumps([{
                     "name": food['foodName'],
@@ -171,7 +173,17 @@ class FrameModule(BaseAgentModule):
             if isinstance(llm_result, str):
                 llm_result = json.loads(llm_result)
                 
-            # 只返回新生成的食谱部分
+            # 确保返回的food_details中包含customizedId
+            for food in llm_result['food_details']:
+                if 'customizedId' not in food:
+                    # 如果LLM没有返回customizedId，尝试从原始请求中匹配
+                    original_food = next(
+                        (f for f in input_data['replaceFoodList'] if f['foodName'] == food['foodName']), 
+                        None
+                    )
+                    if original_food:
+                        food['customizedId'] = original_food.get('customizedId')
+                        
             return {
                 "code": 0,
                 "msg": "成功",
@@ -181,7 +193,7 @@ class FrameModule(BaseAgentModule):
                     "meals": [{
                         "mealTypeText": input_data['mealTypeText'],
                         "totalEnergy": llm_result['total_energy'],
-                        "foodDetailList": llm_result['food_details']  # 只返回新生成的食谱
+                        "foodDetailList": llm_result['food_details']  # 包含customizedId的食谱
                     }]
                 }
             }
