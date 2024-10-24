@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  nutrition-agent:
+    build: .
+    container_name: nutrition-agent
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - ENVIRONMENT=production
+    restart: unless-stopped
