@@ -41,7 +41,7 @@ class FrameModule(BaseAgentModule):
         batch_inputs = []
         
         for day in range(1, 8):
-            for meal in ['breakfast', 'lunch', 'dinner']:
+            for meal in ['早餐', '午餐', '晚餐']:
                 batch_inputs.append({
                     'batch_name': f"{day}_{meal}",
                     'prompt_template': frame_prompt.meal_plan_prompt,

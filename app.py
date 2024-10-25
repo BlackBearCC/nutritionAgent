@@ -90,7 +90,7 @@ class FoodReplaceRequest(BaseModel):
 
 # 生成食谱用的模型
 class GenerateMealPlanData(BaseModel):
-    id: str
+    userId: str
     foodDate: str
     record: List[DayMeal]  # 使用 record 和 DayMeal
 
@@ -278,7 +278,7 @@ async def process_and_submit_meal_plan(
 
         # 使用 GenerateMealPlanData
         meal_data = GenerateMealPlanData(
-            id=str(request.userId),
+            userId=str(request.userId),
             foodDate=request.customizedDate,
             record=daily_records
         )
