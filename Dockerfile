@@ -2,12 +2,11 @@ FROM registry.cn-hangzhou.aliyuncs.com/big-head/nutrition_agent:latest
 
 WORKDIR /app
 
-# 只复制更新的文件
-COPY ./app.py .
-# COPY ./其他更新的文件 .
+# 复制整个项目目录
+COPY . .
 
 # 如果有新的依赖，可以追加安装
-# RUN pip install --no-cache-dir 新的包名
+# RUN pip install --no-cache-dir -r requirements.txt
 
 # 暴露端口
 EXPOSE 8000
