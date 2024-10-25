@@ -245,7 +245,7 @@ async def process_and_submit_meal_plan(
             try:
                 total_calories = meal['menu']['total_calories']
                 if isinstance(total_calories, str):
-                    # 如果是字符串，尝试清理并转换
+                    # 如果是字符串，尝试清理并转��
                     total_energy = int(total_calories.replace('Kcal', '').replace('kcal', '').strip())
                 elif isinstance(total_calories, (int, float)):
                     # 如果已经是数字，直接使用
@@ -411,12 +411,8 @@ async def replace_foods(
     )
     return BasicResponse(code=0, msg="成功",data="")
 
-
-
-
-
-@app.post("/analyze_pdf", response_model=PdfAnalysisResponse)
-async def analyze_pdf(request: PdfAnalysisRequest):
+# PDF分析的后台处理函数
+async def process_and_submit_pdf_analysis(request: PdfAnalysisRequest):
     try:
         # 初始化 Moonshot 客户端
         client = OpenAI(
@@ -424,7 +420,6 @@ async def analyze_pdf(request: PdfAnalysisRequest):
             base_url="https://api.moonshot.cn/v1",
         )
         
-        # 构建对话
         messages = [
             {
                 "role": "system",
@@ -443,7 +438,7 @@ async def analyze_pdf(request: PdfAnalysisRequest):
             },
             {
                 "role": "system",
-                "content": request.pdfUrl,  # 直接传入PDF的URL
+                "content": request.pdfUrl,
             },
             {
                 "role": "user", 
@@ -451,36 +446,47 @@ async def analyze_pdf(request: PdfAnalysisRequest):
             },
         ]
         
-        # 调用 chat-completion
-        completion = client.chat.completions.create(
+        # 使用 asyncio.to_thread 将同步操作转换为异步
+        completion = await asyncio.to_thread(
+            client.chat.completions.create,
             model="moonshot-v1-32k",
             messages=messages,
             temperature=0.7,
         )
         
-        # 获取分析结果
         analysis_result = completion.choices[0].message.content
         
-        # 构建响应
-        return PdfAnalysisResponse(
-            code=0,
-            msg="成功",
-            data=PdfAnalysisData(
-                id=request.id,
-                pdfAnalysis=analysis_result
-            )
-        )
+        result_data = {
+            "code": 0,
+            "msg": "成功",
+            "data": {
+                "id": request.id,
+                "pdfAnalysis": analysis_result
+            }
+        }
         
+        # 异步提交结果
+        async with httpx.AsyncClient() as client:
+            submit_url = "http://172.16.10.148:9050/food/view/intellectual-proxy/receivePdfResult"
+            response = await client.post(submit_url, json=result_data)
+            response.raise_for_status()
+            logging.info(f"成功提交PDF分析结果到 {submit_url}")
+            
     except Exception as e:
-        logging.error(f"处理PDF分析请求时发生错误: {str(e)}")
-        return PdfAnalysisResponse(
-            code=1,
-            msg=f"处理失败: {str(e)}",
-            data=PdfAnalysisData(
-                id=request.id,
-                pdfAnalysis=""
-            )
-        )
+        logging.error(f"后台处理PDF分析任务发生错误: {str(e)}")
+
+# 修改PDF分析接口
+@app.post("/analyze_pdf", response_model=BasicResponse)
+async def analyze_pdf(
+    request: PdfAnalysisRequest,
+    background_tasks: BackgroundTasks
+):
+    # 立即返回成功响应，不等待任务处理
+    background_tasks.add_task(
+        process_and_submit_pdf_analysis,
+        request
+    )
+    return BasicResponse(code=0, msg="成功", data="")
 
 if __name__ == "__main__":
     import uvicorn
