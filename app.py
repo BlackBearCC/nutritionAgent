@@ -44,7 +44,7 @@ class MealPlanRequest(BaseModel):
     mealSoup: str
 
 class FoodDetail(BaseModel):
-    foodDetail:List[str]
+    foodDetail: Optional[List[str]] = [] ##食材
     foodName: str
     foodCount: str
     foodDesc: str
@@ -71,6 +71,7 @@ class MealPlanResponse(BaseModel):
 
 class FoodReplaceRequest(BaseModel):
     id: str
+    mealTypeText: str
     CC: List[str]
     sex: str
     age: int
@@ -84,7 +85,6 @@ class FoodReplaceRequest(BaseModel):
     mealStaple: List[str]
     mealSpicy: str
     mealSoup: str
-    mealTypeText: str
     replaceFoodList: List[FoodDetail]
     remainFoodList: List[FoodDetail]
 
