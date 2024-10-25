@@ -44,6 +44,7 @@ class MealPlanRequest(BaseModel):
     mealSoup: str
 
 class FoodDetail(BaseModel):
+    foodDetail:List[str]
     foodName: str
     foodCount: str
     foodDesc: str
@@ -235,6 +236,7 @@ async def process_and_submit_meal_plan(
             processed_dishes = []
             for dish in meal['menu']['dishes']:
                 processed_dish = FoodDetail(
+                    foodDetail=dish.get('detail', []),  # 获取食材列表
                     foodName=dish['name'],
                     foodCount=dish['quantity'],
                     foodDesc=dish['introduction']
@@ -245,7 +247,7 @@ async def process_and_submit_meal_plan(
             try:
                 total_calories = meal['menu']['total_calories']
                 if isinstance(total_calories, str):
-                    # 如果是字符串，尝试清理并转��
+                    # 如果是字符串，尝试清理并转换
                     total_energy = int(total_calories.replace('Kcal', '').replace('kcal', '').strip())
                 elif isinstance(total_calories, (int, float)):
                     # 如果已经是数字，直接使用
@@ -442,7 +444,7 @@ async def process_and_submit_pdf_analysis(request: PdfAnalysisRequest):
             },
             {
                 "role": "user", 
-                "content": "请仔细分析报告，100-150字"
+                "content": "请仔细分析报���，100-150字"
             },
         ]
         
@@ -481,7 +483,7 @@ async def analyze_pdf(
     request: PdfAnalysisRequest,
     background_tasks: BackgroundTasks
 ):
-    # 立即返回成功响应，不等待任务处理
+
     background_tasks.add_task(
         process_and_submit_pdf_analysis,
         request
@@ -491,3 +493,4 @@ async def analyze_pdf(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

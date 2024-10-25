@@ -173,8 +173,11 @@ class FrameModule(BaseAgentModule):
             if isinstance(llm_result, str):
                 llm_result = json.loads(llm_result)
                 
-            # 确保返回的food_details中包含customizedId
+            # 确保返回的food_details中包含所有必要字段
             for food in llm_result['food_details']:
+                if 'foodDetail' not in food:
+                    # 如果LLM没有返回foodDetail，设置一个空列表
+                    food['foodDetail'] = []
                 if 'customizedId' not in food:
                     # 如果LLM没有返回customizedId，尝试从原始请求中匹配
                     original_food = next(
@@ -193,7 +196,13 @@ class FrameModule(BaseAgentModule):
                     "meals": [{
                         "mealTypeText": input_data['mealTypeText'],
                         "totalEnergy": llm_result['total_energy'],
-                        "foodDetailList": llm_result['food_details']  # 包含customizedId的食谱
+                        "foodDetailList": [{
+                            "foodDetail": food.get('foodDetail', []),  # 确保包含foodDetail
+                            "foodName": food['foodName'],
+                            "foodCount": food['foodCount'],
+                            "foodDesc": food['foodDesc'],
+                            "customizedId": food.get('customizedId')
+                        } for food in llm_result['food_details']]
                     }]
                 }
             }
