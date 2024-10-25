@@ -288,6 +288,7 @@ async def process_and_submit_meal_plan(
             msg="成功",
             data=meal_data
         )
+        logging.info(f"数据准备提交: {result_data}")
         
         # 提交结果
         async with httpx.AsyncClient() as client:
@@ -389,7 +390,7 @@ async def process_and_submit_replacement(
             msg="成功",
             data=meal_data
         )
-        
+        logging.info(f"数据准备提交: {result_data}")
         # 提交结果
         async with httpx.AsyncClient() as client:
             response = await client.post(submit_url, json=result_data.dict())
@@ -444,7 +445,7 @@ async def process_and_submit_pdf_analysis(request: PdfAnalysisRequest):
             },
             {
                 "role": "user", 
-                "content": "请仔细分析报���，100-150字"
+                "content": "请仔细分析报告，100-150字"
             },
         ]
         
@@ -466,7 +467,7 @@ async def process_and_submit_pdf_analysis(request: PdfAnalysisRequest):
                 "pdfAnalysis": analysis_result
             }
         }
-        
+        logging.info(f"数据准备提交: {result_data}")
         # 异步提交结果
         async with httpx.AsyncClient() as client:
             submit_url = "http://172.16.10.148:9050/food/view/intellectual-proxy/receivePdfResult"
