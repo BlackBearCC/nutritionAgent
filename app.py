@@ -378,7 +378,8 @@ async def process_and_submit_replacement(
                             customizedId=food.get('customizedId'),
                             foodName=food['foodName'],
                             foodCount=food['foodCount'],
-                            foodDesc=food['foodDesc']
+                            foodDesc=food['foodDesc'],
+                            foodDetail=food.get('foodDetail', [])
                         ) for food in result['data']['meals'][0]['foodDetailList']
                     ]
                 )
