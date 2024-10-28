@@ -24,7 +24,7 @@ class EvaluationModule(BaseAgentModule):
             prompt = follow_up_evaluation_prompt
         else:
             prompt = weekly_meal_evaluation_prompt
-        
+        # evaluation_result = await self.async_call_llm(prompt, evaluation_input,llm_name="qwen2-72b-instruct")
         evaluation_result = await self.async_call_llm(prompt, evaluation_input,llm_name="qwen-turbo")
         
         try:

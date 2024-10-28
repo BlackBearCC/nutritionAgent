@@ -122,68 +122,47 @@ class MealPlanService:
                 iteration_count += 1
                 logging.info(f"完成第 {iteration_count} 次迭代")
 
-            # 按天组织数据
+            # 确保生成7天21餐
             meals_by_day = {}
             for meal in weekly_meal_plan:
                 day = int(meal['day'])
                 if day not in meals_by_day:
                     meals_by_day[day] = []
                 
-                processed_dishes = []
-                for dish in meal['menu']['dishes']:
-                    processed_dish = FoodDetail(
-                        foodDetail=dish.get('detail', []),
-                        foodName=dish['name'],
-                        foodCount=dish['quantity'],
-                        foodDesc=dish['introduction']
-                    )
-                    processed_dishes.append(processed_dish)
-
-                # 处理热量值
-                try:
-                    total_calories = meal['menu']['total_calories']
-                    if isinstance(total_calories, str):
-                        total_energy = int(total_calories.replace('Kcal', '').replace('kcal', '').strip())
-                    elif isinstance(total_calories, (int, float)):
-                        total_energy = int(total_calories)
-                    else:
-                        total_energy = 0
-                        logging.warning(f"无法识别的热量格式: {total_calories}，使用默认值 {total_energy}")
-                except (ValueError, AttributeError) as e:
-                    total_energy = 0
-                    logging.warning(f"处理热量值时出错: {str(e)}，使用默认值 {total_energy}")
-
-                processed_meal = Meal(
-                    mealTypeText=meal['meal'],
-                    totalEnergy=total_energy,
-                    foodDetailList=processed_dishes
-                )
-                meals_by_day[day].append(processed_meal)
-
-            # 构建每天的记录
-            daily_records = []
-            for day, meals in meals_by_day.items():
-                daily_record = DayMeal(
-                    day=day,
-                    meals=meals
-                )
-                daily_records.append(daily_record)
-
-            # 构建最终响应
-            meal_data = GenerateMealPlanData(
-                userId=str(request.userId),
-                foodDate=request.customizedDate,
-                record=daily_records
-            )
+                # 处理评估后的修改餐食
+                if meal.get('is_regenerated'):  # 添加标记表示是否是重新生成的餐食
+                    # 找到并替换原来的餐食
+                    for i, existing_meal in enumerate(meals_by_day[day]):
+                        if existing_meal.mealTypeText == meal['meal']:
+                            meals_by_day[day][i] = self._process_meal(meal)
+                            break
+                else:
+                    # 添加新的餐食
+                    meals_by_day[day].append(self._process_meal(meal))
             
-            result = GenerateMealPlanResponse(
+            # 验证每天都有3餐
+            for day in range(1, 8):  # 7天
+                if day not in meals_by_day:
+                    meals_by_day[day] = []
+                if len(meals_by_day[day]) != 3:
+                    logging.warning(f"第{day}天的餐食数量不足3餐: {len(meals_by_day[day])}")
+                
+            # 构建最终响应
+            daily_records = [
+                DayMeal(day=day, meals=meals)
+                for day, meals in sorted(meals_by_day.items())
+            ]
+            
+            return GenerateMealPlanResponse(
                 code=0,
                 msg="成功",
-                data=meal_data
+                data=GenerateMealPlanData(
+                    userId=str(request.userId),
+                    foodDate=request.customizedDate,
+                    record=daily_records
+                )
             )
-
-            return result
-
+        
         except Exception as e:
             logging.error(f"生成膳食计划时发生错误: {str(e)}")
             raise
@@ -200,4 +179,36 @@ class MealPlanService:
                 logging.info("成功提交膳食计划")
         except Exception as e:
             logging.error(f"提交膳食计划时发生错误: {str(e)}")
+            raise
+
+    def _process_meal(self, meal_data: dict) -> Meal:
+        """处理单个餐食数据"""
+        try:
+            total_calories = meal_data['menu']['total_calories']
+            total_energy = (
+                int(total_calories.replace('Kcal', '').replace('kcal', '').strip())
+                if isinstance(total_calories, str)
+                else int(total_calories)
+                if isinstance(total_calories, (int, float))
+                else 0
+            )
+            
+            processed_dishes = [
+                FoodDetail(
+                    foodDetail=dish.get('detail', []),
+                    foodName=dish['name'],
+                    foodCount=dish['quantity'],
+                    foodDesc=dish['introduction'],
+                    customizedId=dish.get('customizedId')
+                )
+                for dish in meal_data['menu']['dishes']
+            ]
+            
+            return Meal(
+                mealTypeText=meal_data['meal'],
+                totalEnergy=total_energy,
+                foodDetailList=processed_dishes
+            )
+        except Exception as e:
+            logging.error(f"处理餐食数据时发生错误: {str(e)}")
             raise
