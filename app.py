@@ -72,19 +72,19 @@ class MealPlanResponse(BaseModel):
 class FoodReplaceRequest(BaseModel):
     id: str
     mealTypeText: str
-    CC: List[str]
-    sex: str
-    age: int
-    height: str
-    weight: str
-    healthDescription: str
-    mealHabit: str
-    mealAvoid: List[str]
-    mealAllergy: List[str]
-    mealTaste: List[str]
-    mealStaple: List[str]
-    mealSpicy: str
-    mealSoup: str
+    CC: Optional[List[str]] = []
+    sex: Optional[str] = None
+    age: Optional[int] = None
+    height: Optional[str] = None
+    weight: Optional[str] = None
+    healthDescription: Optional[str] = None
+    mealHabit: Optional[str] = None
+    mealAvoid: Optional[List[str]] = []
+    mealAllergy: Optional[List[str]] = []
+    mealTaste: Optional[List[str]] = []
+    mealStaple: Optional[List[str]] = []
+    mealSpicy: Optional[str] = None
+    mealSoup: Optional[str] = None
     replaceFoodList: List[FoodDetail]
     remainFoodList: List[FoodDetail]
 
@@ -326,17 +326,21 @@ async def process_and_submit_replacement(
     try:
         # 构建用户信息字符串
         user_info = f"""
-        户信息：
-        性别：{request.sex}，年龄：{request.age}岁，身高：{request.height}，体重：{request.weight}
-        健康兴趣：{', '.join(request.CC)}
-        健康描述：{request.healthDescription}
-        饮食习惯：{request.mealHabit}
+        用户信息：
+        性别：{request.sex if request.sex else '未知'}
+        年龄：{f'{request.age}岁' if request.age else '未知'}
+        身高：{request.height if request.height else '未知'}
+        体重：{request.weight if request.weight else '未知'}
+        出生日期：{(datetime.now() - timedelta(days=request.age*365)).strftime('%Y年%m月%d日') if request.age else '未知'}
+        健康兴趣：{', '.join(request.CC) if request.CC else '无'}
+        健康描述：{request.healthDescription if request.healthDescription else '无'}
+        饮食习惯：{request.mealHabit if request.mealHabit else '无'}
         饮食禁忌：{', '.join(request.mealAvoid) if request.mealAvoid else '无'}
-        食物过敏：{', '.join(request.mealAllergy)}
-        口味偏好：{', '.join(request.mealTaste)}
-        主食偏好：{', '.join(request.mealStaple)}
-        辣度偏好：{request.mealSpicy}
-        喝汤习惯：{request.mealSoup}
+        食物过敏：{', '.join(request.mealAllergy) if request.mealAllergy else '无'}
+        口味偏好：{', '.join(request.mealTaste) if request.mealTaste else '无'}
+        主食偏好：{', '.join(request.mealStaple) if request.mealStaple else '无'}
+        辣度偏好：{request.mealSpicy if request.mealSpicy else '无'}
+        喝汤习惯：{request.mealSoup if request.mealSoup else '无'}
         """
         
         frame_module = FrameModule()
