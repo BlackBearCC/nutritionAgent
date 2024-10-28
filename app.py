@@ -29,19 +29,19 @@ app = FastAPI()
 class MealPlanRequest(BaseModel):
     userId: str
     customizedDate: str
-    CC: List[str]
-    sex: str
-    age: int
-    height: str
-    weight: str
-    healthDescription: str
-    mealHabit: str
-    mealAvoid: List[str]
-    mealAllergy: List[str]
-    mealTaste: List[str]
-    mealStaple: List[str]
-    mealSpicy: str
-    mealSoup: str
+    CC: Optional[List[str]] = []
+    sex: Optional[str] = None
+    age: Optional[int] = None
+    height: Optional[str] = None
+    weight: Optional[str] = None
+    healthDescription: Optional[str] = None
+    mealHabit: Optional[str] = None
+    mealAvoid: Optional[List[str]] = []
+    mealAllergy: Optional[List[str]] = []
+    mealTaste: Optional[List[str]] = []
+    mealStaple: Optional[List[str]] = []
+    mealSpicy: Optional[str] = None
+    mealSoup: Optional[str] = None
 
 class FoodDetail(BaseModel):
     foodDetail: Optional[List[str]] = [] ##食材
@@ -138,20 +138,23 @@ async def process_and_submit_meal_plan(
     submit_url: str
 ):
     try:
-        # 构建用户信息字符串
+        # 构建用户信息字符串，处理可能为空的字段
         user_info = f"""
         用户信息：
-        性别：{request.sex}，年龄：{request.age}岁，身高：{request.height}，体重：{request.weight}
-        出生日期：{(datetime.now() - timedelta(days=request.age*365)).strftime('%Y年%m月%d日')}
-        健康兴趣：{', '.join(request.CC)}
-        健康描述：{request.healthDescription}
-        饮食习惯：{request.mealHabit}
+        性别：{request.sex if request.sex else '未知'}
+        年龄：{f'{request.age}岁' if request.age else '未知'}
+        身高：{request.height if request.height else '未知'}
+        体重：{request.weight if request.weight else '未知'}
+        出生日期：{(datetime.now() - timedelta(days=request.age*365)).strftime('%Y年%m月%d日') if request.age else '未知'}
+        健康兴趣：{', '.join(request.CC) if request.CC else '无'}
+        健康描述：{request.healthDescription if request.healthDescription else '无'}
+        饮食习惯：{request.mealHabit if request.mealHabit else '无'}
         饮食禁忌：{', '.join(request.mealAvoid) if request.mealAvoid else '无'}
-        食物过敏：{', '.join(request.mealAllergy)}
-        口味偏好：{', '.join(request.mealTaste)}
-        主食偏好：{', '.join(request.mealStaple)}
-        辣度偏好：{request.mealSpicy}
-        喝汤习惯：{request.mealSoup}
+        食物过敏：{', '.join(request.mealAllergy) if request.mealAllergy else '无'}
+        口味偏好：{', '.join(request.mealTaste) if request.mealTaste else '无'}
+        主食偏好：{', '.join(request.mealStaple) if request.mealStaple else '无'}
+        辣度偏好：{request.mealSpicy if request.mealSpicy else '无'}
+        喝汤习惯：{request.mealSoup if request.mealSoup else '无'}
         """
         
         # 初始化模块
@@ -310,7 +313,8 @@ async def generate_meal_plan(
     background_tasks.add_task(
         process_and_submit_meal_plan,
         request,
-        "http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedResult"
+        # "http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedResult"
+        "http://172.16.10.10:9050/food/view/intellectual-proxy/receiveFoodCustomizedResult"
     )
     return BasicResponse(code=0, msg="成功",data="")
 
@@ -411,7 +415,8 @@ async def replace_foods(
     background_tasks.add_task(
         process_and_submit_replacement,
         request,
-        "http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedReplace"
+        # "http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedReplace"
+        " http://172.16.10.10:9050/food/view/intellectual-proxy/receiveFoodCustomizedReplace "
     )
     return BasicResponse(code=0, msg="成功",data="")
 
@@ -471,7 +476,8 @@ async def process_and_submit_pdf_analysis(request: PdfAnalysisRequest):
         logging.info(f"数据准备提交: {result_data}")
         # 异步提交结果
         async with httpx.AsyncClient() as client:
-            submit_url = "http://172.16.10.148:9050/food/view/intellectual-proxy/receivePdfResult"
+            # submit_url = "http://172.16.10.148:9050/food/view/intellectual-proxy/receivePdfResult"
+            submit_url = " http://172.16.10.10:9050/food/view/intellectual-proxy/receivePdfResult"
             response = await client.post(submit_url, json=result_data)
             response.raise_for_status()
             logging.info(f"成功提交PDF分析结果到 {submit_url}")
