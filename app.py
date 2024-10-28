@@ -313,8 +313,8 @@ async def generate_meal_plan(
     background_tasks.add_task(
         process_and_submit_meal_plan,
         request,
-        "http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedResult"
-        # "http://172.16.10.10:9050/food/view/intellectual-proxy/receiveFoodCustomizedResult"
+        # "http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedResult"
+        "http://172.16.10.10:9050/food/view/intellectual-proxy/receiveFoodCustomizedResult"
     )
     return BasicResponse(code=0, msg="成功",data="")
 
@@ -419,8 +419,8 @@ async def replace_foods(
     background_tasks.add_task(
         process_and_submit_replacement,
         request,
-        "http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedReplace"
-        # "http://172.16.10.10:9050/food/view/intellectual-proxy/receiveFoodCustomizedReplace"
+        # "http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedReplace"
+        "http://172.16.10.10:9050/food/view/intellectual-proxy/receiveFoodCustomizedReplace"
     )
     return BasicResponse(code=0, msg="成功",data="")
 
@@ -480,8 +480,8 @@ async def process_and_submit_pdf_analysis(request: PdfAnalysisRequest):
         logging.info(f"数据准备提交: {result_data}")
         # 异步提交结果
         async with httpx.AsyncClient() as client:
-            submit_url = "http://172.16.10.148:9050/food/view/intellectual-proxy/receivePdfResult"
-            # submit_url = "http://172.16.10.10:9050/food/view/intellectual-proxy/receivePdfResult"
+            # submit_url = "http://172.16.10.148:9050/food/view/intellectual-proxy/receivePdfResult" ##联调
+            submit_url = "http://172.16.10.10:9050/food/view/intellectual-proxy/receivePdfResult" ##测试
             response = await client.post(submit_url, json=result_data)
             response.raise_for_status()
             logging.info(f"成功提交PDF分析结果到 {submit_url}")
