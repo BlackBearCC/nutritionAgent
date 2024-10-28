@@ -18,3 +18,4 @@ numpy>=1.24.3
 
 aiofiles 
 python-multipart
+pydantic-settings

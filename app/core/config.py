@@ -1,3 +1,4 @@
+from functools import lru_cache
 from pydantic_settings import BaseSettings
 from typing import Optional
 
@@ -22,4 +23,12 @@ class Settings(BaseSettings):
     
     class Config:
         env_file = ".env"
-        extra = "allow"  # 允许额外的字段
+        extra = "allow"  
+
+@lru_cache()
+def get_settings() -> Settings:
+    """
+    获取设置单例
+    使用 lru_cache 确保只创建一次实例
+    """
+    return Settings()

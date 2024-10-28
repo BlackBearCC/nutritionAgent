@@ -4,7 +4,7 @@ import httpx
 import json
 from datetime import datetime, timedelta
 from fastapi import HTTPException
-from app.core.config import Settings
+from app.core.config import get_settings
 from app.models.meal_plan import (
     MealPlanRequest, GenerateMealPlanResponse, 
     GenerateMealPlanData, DayMeal, Meal, FoodDetail,
@@ -17,7 +17,7 @@ from evaluation.evaluation_module import EvaluationModule
 
 class MealPlanService:
     def __init__(self):
-        self.settings = Settings()
+        self.settings = get_settings()  # 使用 get_settings() 而不是直接实例化
         self.analysis_module = AnalysisModule()
         self.frame_module = FrameModule()
         self.evaluation_module = EvaluationModule()

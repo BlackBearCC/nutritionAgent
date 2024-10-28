@@ -1,18 +1,32 @@
 version: '3.8'
 
 services:
-  nutrition-agent:
-    build: .
-    # image: registry.cn-hangzhou.aliyuncs.com/big-head/nutrition_agent:latest
-    image: registry.cn-hangzhou.aliyuncs.com/big-head/nutrition_agent:test  
-    container_name: nutrition-agent
+  nutrition-agent-test:
+    image: registry.cn-hangzhou.aliyuncs.com/your_namespace/nutrition-agent:latest
+    container_name: nutrition-agent-test
     ports:
-      - "8000:8000"
+      - "8088:8000"
     volumes:
-      - .:/app
+      - ./.env:/app/.env
     env_file:
       - .env
     environment:
-      - PYTHONPATH=/app
-      - ENVIRONMENT=production
-    restart: unless-stopped
+      - ENV=test
+      - PDF_ANALYSIS_SUBMIT_URL=http://172.16.10.10:9050/food/view/intellectual-proxy/receivePdfResult
+      - MEAL_PLAN_SUBMIT_URL=http://172.16.10.10:9050/food/view/intellectual-proxy/receiveFoodCustomizedResult
+      - MEAL_PLAN_REPLACE_URL=http://172.16.10.10:9050/food/view/intellectual-proxy/receiveFoodCustomizedReplace
+
+  nutrition-agent-dev:
+    image: registry.cn-hangzhou.aliyuncs.com/your_namespace/nutrition-agent:latest
+    container_name: nutrition-agent-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./.env:/app/.env
+    env_file:
+      - .env
+    environment:
+      - ENV=dev
+      - PDF_ANALYSIS_SUBMIT_URL=http://172.16.10.148:9050/food/view/intellectual-proxy/receivePdfResult
+      - MEAL_PLAN_SUBMIT_URL=http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedResult
+      - MEAL_PLAN_REPLACE_URL=http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedReplace

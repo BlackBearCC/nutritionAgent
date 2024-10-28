@@ -17,12 +17,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# 注册路由 - 保持原有的PDF分析路由
+# PDF分析路由
 app.include_router(pdf_endpoint.router)
 
 # 添加食谱定制路由
 app.include_router(meal_endpoint.router)
-
+##dcoker从这启动
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True,workers=8)
