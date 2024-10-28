@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from app.models import pdf_analysis
 from app.api.endpoints import pdf_analysis as pdf_endpoint
+from app.api.endpoints import meal_plan as meal_endpoint 
 import logging
 
 # 配置日志
@@ -11,13 +12,16 @@ logging.basicConfig(
 )
 
 app = FastAPI(
-    title="智能健康分析系统",
-    description="基于AI的健康报告分析系统",
+    title="智能健康系统",
+    description="基于AI的健康饮食推荐系统",
     version="1.0.0"
 )
 
-# 直接使用路由，不添加前缀
+# 注册路由 - 保持原有的PDF分析路由
 app.include_router(pdf_endpoint.router)
+
+# 添加食谱定制路由
+app.include_router(meal_endpoint.router)
 
 if __name__ == "__main__":
     import uvicorn

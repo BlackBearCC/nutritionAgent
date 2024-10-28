@@ -172,6 +172,7 @@ async def process_and_submit_meal_plan(
             'user_info': user_info
         }
         ingredient_input, ingredient_result, meal_plan_input, weekly_meal_plan = await frame_module.process(frame_input)
+        print("ddddddddd"+weekly_meal_plan)
 
         # 评估和优化食谱
         evaluation_history = []
