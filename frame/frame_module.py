@@ -57,27 +57,29 @@ class FrameModule(BaseAgentModule):
                     }
                 })
 
-        results = await self.batch_async_call_llm(batch_inputs)
+        results = await self.batch_async_call_llm(batch_inputs, parse_json=True)
         
         logging.info(f"批处理结果: {results}")  # 保留这行日志
         
         weekly_meal_plan = []
         for batch_name, result in results.items():
-            logging.info(f"处理 {batch_name} 的结果: {result}")  # 保留这行日志
+            logging.info(f"处理 {batch_name} 的结果: {result}")
             try:
                 if result is None:
                     logging.error(f"{batch_name} 的结果为None")
                     continue
-                # 移除 ensure_ascii 参数
-                meal_plan = json.loads(result)
-                weekly_meal_plan.append(meal_plan)
-                logging.info(f"成功解析 {batch_name} 的结果")  # 保留这行日志
-            except json.JSONDecodeError as e:
-                logging.error(f"{batch_name} 的食谱框架不是有效的JSON格式: {str(e)}")
-                logging.error(f"原始结果: {result}")
+                
+                # 关键修改：直接使用 result，不需要再次解析 JSON
+                if isinstance(result, dict):
+                    weekly_meal_plan.append(result)
+                    logging.info(f"成功处理 {batch_name} 的结果")
+                else:
+                    logging.error(f"{batch_name} 的结果格式不正确: {result}")
+                    
             except Exception as e:
                 logging.error(f"处理 {batch_name} 时发生错误: {str(e)}")
                 logging.error(f"原始结果: {result}")
+                continue
 
         logging.info("成功生成7天21餐食谱框架")
         logging.info(f"weekly_meal_plan: {weekly_meal_plan}")  # 保留这行日志
