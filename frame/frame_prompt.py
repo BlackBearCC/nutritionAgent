@@ -64,7 +64,7 @@ meal_plan_prompt = """
 请以JSON格式输出结果，结构如下：
 {{
   "day": {day},
-  "meal": "{meal}",
+  "meal": "{meal}",//餐次必须为早餐、午餐、晚餐之一，禁用其他同义词
   "menu": {{
     "total_calories": "XX（整数类型）",
     "dishes": [
@@ -117,7 +117,7 @@ regenerate_meal_plan_prompt = """
 请以JSON格式输出结果，结构如下：
 {{
   "day": {day},
-  "meal": "{meal}",
+  "meal": "{meal}",//餐次必须为早餐、午餐、晚餐之一，禁用其他同义词
   "menu": {{
     "total_calories": "XX（整数类型）",
     "dishes": [
