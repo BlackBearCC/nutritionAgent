@@ -3,10 +3,12 @@ import asyncio
 import httpx
 import json
 from datetime import datetime, timedelta
+from fastapi import HTTPException
 from app.core.config import Settings
 from app.models.meal_plan import (
     MealPlanRequest, GenerateMealPlanResponse, 
-    GenerateMealPlanData, DayMeal, Meal, FoodDetail
+    GenerateMealPlanData, DayMeal, Meal, FoodDetail,
+    FoodReplaceRequest, ReplaceMealPlanData, ReplaceMealPlanResponse
 )
 from analyse.analysis_module import AnalysisModule
 from frame import frame_prompt
@@ -211,4 +213,84 @@ class MealPlanService:
             )
         except Exception as e:
             logging.error(f"处理餐食数据时发生错误: {str(e)}")
+            raise
+
+    async def replace_foods(self, request: FoodReplaceRequest):
+        """替换食材的服务方法"""
+        try:
+            # 构建用户信息
+            user_info = self._build_user_info(request)
+            
+            # 构建替换食物的输入
+            replace_input = {
+                'id': request.id,
+                'mealTypeText': request.mealTypeText,
+                'user_info': user_info,
+                'replaceFoodList': [
+                    {
+                        'foodName': food.foodName,
+                        'foodCount': food.foodCount,
+                        'foodDesc': food.foodDesc,
+                        'customizedId': food.customizedId
+                    } for food in request.replaceFoodList
+                ],
+                'remainFoodList': [
+                    {
+                        'foodName': food.foodName,
+                        'foodCount': food.foodCount,
+                        'foodDesc': food.foodDesc
+                    } for food in request.remainFoodList
+                ]
+            }
+            
+            # 调用frame模块的替换功能
+            result = await self.frame_module.replace_foods(replace_input)
+            
+            if result['code'] != 0:
+                raise HTTPException(status_code=400, detail=result['msg'])
+
+            # 构建响应数据
+            meal_data = ReplaceMealPlanData(
+                id=request.id,
+                foodDate=datetime.now().strftime("%Y-%m-%d"),
+                meals=[
+                    Meal(
+                        mealTypeText=request.mealTypeText,
+                        totalEnergy=result['data']['meals'][0]['totalEnergy'],
+                        foodDetailList=[
+                            FoodDetail(
+                                customizedId=food.get('customizedId'),
+                                foodName=food['foodName'],
+                                foodCount=food['foodCount'],
+                                foodDesc=food['foodDesc'],
+                                foodDetail=food.get('foodDetail', [])
+                            ) for food in result['data']['meals'][0]['foodDetailList']
+                        ]
+                    )
+                ]
+            )
+            
+            return ReplaceMealPlanResponse(
+                code=0,
+                msg="成功",
+                data=meal_data
+            )
+
+        except Exception as e:
+            logging.error(f"替换食材时发生错误: {str(e)}")
+            raise
+
+    async def submit_replacement(self, replacement_plan: ReplaceMealPlanResponse) -> None:
+        """提交替换结果的方法"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    self.settings.MEAL_PLAN_REPLACE_URL,
+                    json=replacement_plan.dict(),
+                    timeout=30.0
+                )
+                response.raise_for_status()
+                logging.info("成功提交食材替换结果")
+        except Exception as e:
+            logging.error(f"提交食材替换结果时发生错误: {str(e)}")
             raise
