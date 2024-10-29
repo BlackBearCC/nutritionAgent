@@ -1,0 +1,57 @@
+JsonOutputParser 和 LangChain Expression Language (LCEL) 的结合使用可以有效地处理和解析语言模型的输出为结构化的 JSON 格式。以下是它们结合使用的主要用法和步骤：
+
+JsonOutputParser
+功能: JsonOutputParser 是一个内置的输出解析器，专门用于解析和返回符合指定 JSON 模式的输出。它支持流式输出，可以逐步返回部分 JSON 对象。
+使用场景: 当需要从语言模型获取结构化数据时，JsonOutputParser 可以帮助确保输出符合预期的 JSON 结构。
+LCEL
+功能: LCEL 提供了一种声明式的方法来构建和优化运行链（Runnables）。它允许用户描述想要的操作，而不是具体的实现方式，从而简化了复杂的任务管理。
+优势: LCEL 支持并行执行、异步处理和流式输出，能够提高运行效率和响应速度。
+结合使用的步骤
+定义数据结构: 使用 Pydantic 定义所需的 JSON 数据结构。例如，可以定义一个包含 setup 和 punchline 字段的笑话模型。
+
+python
+Copy
+from pydantic import BaseModel, Field
+
+class Joke(BaseModel):
+    setup: str = Field(description="问题")
+    punchline: str = Field(description="答案")
+创建解析器: 实例化 JsonOutputParser，并将 Pydantic 模型传递给它，以便解析器知道期望的输出格式。
+
+python
+Copy
+from langchain_core.output_parsers import JsonOutputParser
+
+parser = JsonOutputParser(pydantic_object=Joke)
+构建提示模板: 使用 PromptTemplate 创建一个提示模板，将解析器的格式说明注入到提示中。
+
+python
+Copy
+from langchain_core.prompts import PromptTemplate
+
+prompt = PromptTemplate(
+    template="回答用户查询。\n{format_instructions}\n{query}\n",
+    input_variables=["query"],
+    partial_variables={"format_instructions": parser.get_format_instructions()},
+)
+构建运行链: 将提示、模型和解析器组合成一个运行链。使用 LCEL 的方式可以简化这一过程。
+
+python
+Copy
+from langchain_openai import ChatOpenAI
+
+model = ChatOpenAI(temperature=0)
+chain = prompt | model | parser
+调用链: 使用 invoke 方法调用链，传入查询并获取结构化的 JSON 输出。
+
+python
+Copy
+result = chain.invoke({"query": "告诉我一个笑话。"})
+示例输出
+通过上述步骤，最终的输出将是一个符合 Joke 模型的 JSON 对象，例如：
+
+json
+Copy
+{"setup": "为什么番茄变红了？", "punchline": "因为它看到了沙拉穿衣服！"}
+总结
+结合使用 JsonOutputParser 和 LCEL，可以高效地从语言模型获取结构化数据，简化了数据处理的复杂性，并提高了应用的响应速度和可维护性。
