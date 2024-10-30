@@ -89,17 +89,17 @@ class BaseAgentModule(ABC):
             "rate_limit": [
                 {"model_name": "qwen-turbo", "temperature": 0.7, "api_key": os.getenv('DASHSCOPE_API_KEY_BACKUP')},  # 先换备用key
                 {"model_name": "qwen-plus", "temperature": 0.7, "api_key": os.getenv('DASHSCOPE_API_KEY_BACKUP')},  # 换更强模型
-                {"model_name": "qwen2-72b-instruct", "temperature": 0.7, "api_key": os.getenv('DASHSCOPE_API_KEY_BACKUP')}  # 最强模型
+                {"model_name": "qwen-turbo", "temperature": 0.7, "api_key": os.getenv('DASHSCOPE_API_KEY_BACKUP')}  # 最强模型
             ],
             "parser": [
                 {"model_name": "qwen-turbo", "temperature": 0.5},  # 降低温度
                 {"model_name": "qwen-plus", "temperature": 0.3},  # 更强模型+更低温度
-                {"model_name": "qwen2-72b-instruct", "temperature": 0.7,"api_key": os.getenv('DASHSCOPE_API_KEY_BACKUP')}  # 最强模型+最低温度+切换key
+                {"model_name": "qwen-turbo", "temperature": 0.7,"api_key": os.getenv('DASHSCOPE_API_KEY_BACKUP')}  # 最强模型+最低温度+切换key
             ],
             "general": [
                 {"model_name": "qwen-turbo", "temperature": 0.7, "api_key": self.llm_api_key},
                 {"model_name": "qwen-plus", "temperature": 0.5, "api_key": self.llm_api_key},
-                {"model_name": "qwen2-72b-instruct", "temperature": 0.3, "api_key": os.getenv('DASHSCOPE_API_KEY_BACKUP')}
+                {"model_name": "qwen-turbo", "temperature": 0.3, "api_key": os.getenv('DASHSCOPE_API_KEY_BACKUP')}
             ]
         }
         
