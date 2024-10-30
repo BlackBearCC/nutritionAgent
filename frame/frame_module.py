@@ -4,6 +4,7 @@ import logging
 import json
 import datetime
 from frame.default_meal_library import DefaultMealLibrary
+import random
 
 
 class FrameModule(BaseAgentModule):
@@ -389,3 +390,17 @@ class FrameModule(BaseAgentModule):
                 for meal in ['早餐', '午餐', '晚餐']:
                     default_plan.append(self._get_default_meal_plan(day, meal))
             return default_plan
+
+    def _generate_random_energy(self, meal_type: str, food_type: str = None) -> int:
+        """生成合理范围内的随机能量值"""
+        if food_type and food_type in DefaultMealLibrary.DISH_ENERGY_RANGES:
+            min_energy, max_energy = DefaultMealLibrary.DISH_ENERGY_RANGES[food_type]
+        else:
+            # 根据餐次类型选择范围
+            min_energy, max_energy = DefaultMealLibrary.ENERGY_RANGES.get(
+                meal_type, 
+                (60, 180)  # 默认范围
+            )
+        
+        # 生成随机值，并确保是10的倍数
+        return round(random.randint(min_energy, max_energy) / 10) * 10
