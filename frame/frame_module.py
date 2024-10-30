@@ -174,11 +174,23 @@ class FrameModule(BaseAgentModule):
             # 确保llm_result是字典类型
             if isinstance(llm_result, str):
                 llm_result = json.loads(llm_result)
+            
+            # 关键修改：处理返回结果的结构转换
+            food_details = []
+            if 'food_details' in llm_result:
+                food_details = llm_result['food_details']
+            elif 'foodDetailList' in llm_result:
+                food_details = llm_result['foodDetailList']
+            else:
+                raise ValueError("LLM返回结果缺少必要的食物详情字段")
+
+            total_energy = llm_result.get('total_energy', 0)
+            if 'totalEnergy' in llm_result:
+                total_energy = llm_result['totalEnergy']
                 
             # 确保返回的food_details中包含所有必要字段
-            for food in llm_result['food_details']:
+            for food in food_details:
                 if 'foodDetail' not in food:
-                    # 如果LLM没有返回foodDetail，设置一个空列表
                     food['foodDetail'] = []
                 if 'customizedId' not in food:
                     # 如果LLM没有返回customizedId，尝试从原始请求中匹配
@@ -197,14 +209,15 @@ class FrameModule(BaseAgentModule):
                     "foodDate": datetime.datetime.now().strftime("%Y-%m-%d"),
                     "meals": [{
                         "mealTypeText": input_data['mealTypeText'],
-                        "totalEnergy": llm_result['total_energy'],
+                        "totalEnergy": total_energy,
                         "foodDetailList": [{
-                            "foodDetail": food.get('foodDetail', []),  # 确保包含foodDetail
+                            "foodDetail": food.get('foodDetail', []),
                             "foodName": food['foodName'],
                             "foodCount": food['foodCount'],
                             "foodDesc": food['foodDesc'],
+                            "foodEnergy": food.get('foodEnergy', 0),
                             "customizedId": food.get('customizedId')
-                        } for food in llm_result['food_details']]
+                        } for food in food_details]
                     }]
                 }
             }

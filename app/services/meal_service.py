@@ -201,6 +201,7 @@ class MealPlanService:
                     foodName=dish['name'],
                     foodCount=dish['quantity'],
                     foodDesc=dish['introduction'],
+                    foodEnergy = dish['energy'],
                     customizedId=dish.get('customizedId')
                 )
                 for dish in meal_data['menu']['dishes']
@@ -263,6 +264,7 @@ class MealPlanService:
                                 foodName=food['foodName'],
                                 foodCount=food['foodCount'],
                                 foodDesc=food['foodDesc'],
+                                foodEnergy = food['foodEnergy'],
                                 foodDetail=food.get('foodDetail', [])
                             ) for food in result['data']['meals'][0]['foodDetailList']
                         ]

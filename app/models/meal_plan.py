@@ -7,6 +7,7 @@ class FoodDetail(BaseModel):
     foodName: str
     foodCount: str
     foodDesc: str
+    foodEnergy: Optional[int] = 0 
     customizedId: Optional[int] = None
 
 class Meal(BaseModel):
