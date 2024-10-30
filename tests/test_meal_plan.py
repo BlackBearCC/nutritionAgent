@@ -76,7 +76,7 @@ class MealPlanEvaluator(BaseAgentModule):
                     "user_info": input_data["user_info"],
                     "meal_plan": input_data["meal_plan"]
                 },
-                parse_json=True,
+                output_parser_type="json",
                 llm_name="qwen-max"
             )
             return response

@@ -114,7 +114,7 @@ class FrameModule(BaseAgentModule):
             "improvement_suggestion": improvement_suggestion
         }
         
-        new_meal_plan = await self.async_call_llm(meal_plan_template, invoke_input, parse_json=True)
+        new_meal_plan = await self.async_call_llm(meal_plan_template, invoke_input,  output_parser_type="json")
         
         try:
             # 移除 ensure_ascii 参数
