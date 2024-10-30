@@ -3,7 +3,7 @@ import os
 from langchain_community.llms.tongyi import Tongyi
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
-from langchain.output_parsers import RetryOutputParser, RetryWithErrorOutputParser
+from langchain_core.exceptions import OutputParserException
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.pydantic_v1 import BaseModel, Field
 import logging
@@ -25,7 +25,7 @@ class BaseAgentModule(ABC):
     async def process(self, input_data: dict):
         pass
     
-    async def async_call_llm(self, prompt_template, invoke_input: dict, llm_name="qwen-turbo", output_parser_type="str", **kwargs):
+    async def async_call_llm(self, prompt_template, invoke_input: dict, llm_name="qwen-turbo", output_parser_type="str", max_retries=3, retry_delay=0.1, **kwargs):
         llm = Tongyi(model_name=llm_name, temperature=0.7, top_k=100, top_p=0.9, dashscope_api_key=self.llm_api_key)
         prompt_text = self.generate_prompt_text(prompt_template, **kwargs)
         prompt = PromptTemplate(template=prompt_text, input_variables=invoke_input.keys())
@@ -37,32 +37,83 @@ class BaseAgentModule(ABC):
             output_parser = StrOutputParser()
         
         chain = prompt | llm | output_parser
-        try:
-            response = await chain.ainvoke(invoke_input)
-            logging.info(f"Response: {response}")
-            return response
-        except RateLimitError:
-            logging.error("Rate limit reached, retrying...")
-            response = await self.retry_chain(chain, kwargs)
-            return response
-        except Exception as e:
-            logging.error(f"Unexpected error occurred: {e}")
-            raise e
+        
+        for attempt in range(max_retries):
+            try:
+                response = await chain.ainvoke(invoke_input)
+                # response = response+"www" ##测试重试效果
+                logging.info(f"Response: {response}")
+                return response
+            except RateLimitError:
+                if attempt < max_retries - 1:
+                    wait_time = min(retry_delay * (2 ** attempt), 0.5)  # 最大等待500ms
+                    logging.warning(f"Rate limit reached, waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
+                    await asyncio.sleep(wait_time)
+                    # 尝试使用备用LLM
+                    llm = self._get_retry_llm(attempt)
+                    chain = prompt | llm | output_parser
+                    continue
+                logging.error("Max retries reached for rate limit")
+                raise
+            except OutputParserException as e:
+                if attempt < max_retries - 1:
+                    wait_time = min(retry_delay * (2 ** attempt), 0.5)  # 最大等待500ms
+                    logging.warning(f"Output parsing failed: {e}. Waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
+                    await asyncio.sleep(wait_time)
+                    # 解析错误时，尝试调整温度和模型
+                    llm = self._get_retry_llm(attempt, error_type="parser")
+                    chain = prompt | llm | output_parser
+                    continue
+                logging.error("Max retries reached for output parsing")
+                raise
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait_time = min(retry_delay * (2 ** attempt), 0.5)  # 最大等待500ms
+                    logging.warning(f"Unexpected error: {e}. Waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
+                    await asyncio.sleep(wait_time)
+                    # 其他错误时，尝试切换API key和模型
+                    llm = self._get_retry_llm(attempt, error_type="general")
+                    chain = prompt | llm | output_parser
+                    continue
+                logging.error(f"Max retries reached for error: {e}")
+                raise
 
     def generate_prompt_text(self, prompt_template, **kwargs):
         for key, value in kwargs.items():
             prompt_template = prompt_template.replace(f'{{{key}}}', str(value))
         return prompt_template
 
-    async def retry_chain(self, chain, kwargs):
-        try:
-            response = await chain.ainvoke(kwargs)
-            logging.info(f"Retry Response: {response}")
-            return response
-        except Exception as e:
-            logging.error(f"Retry failed: {e}")
-            raise e
-    
+    def _get_retry_llm(self, attempt: int, error_type: str = "rate_limit") -> Tongyi:
+        """根据重试次数和错误类型获取不同配置的LLM"""
+        retry_configs = {
+            "rate_limit": [
+                {"model_name": "qwen-turbo", "temperature": 0.7, "api_key": os.getenv('DASHSCOPE_API_KEY_BACKUP')},  # 先换备用key
+                {"model_name": "qwen-plus", "temperature": 0.7, "api_key": os.getenv('DASHSCOPE_API_KEY_BACKUP')},  # 换更强模型
+                {"model_name": "qwen2-72b-instruct", "temperature": 0.7, "api_key": os.getenv('DASHSCOPE_API_KEY_BACKUP')}  # 最强模型
+            ],
+            "parser": [
+                {"model_name": "qwen-turbo", "temperature": 0.5},  # 降低温度
+                {"model_name": "qwen-plus", "temperature": 0.3},  # 更强模型+更低温度
+                {"model_name": "qwen2-72b-instruct", "temperature": 0.7,"api_key": os.getenv('DASHSCOPE_API_KEY_BACKUP')}  # 最强模型+最低温度+切换key
+            ],
+            "general": [
+                {"model_name": "qwen-turbo", "temperature": 0.7, "api_key": self.llm_api_key},
+                {"model_name": "qwen-plus", "temperature": 0.5, "api_key": self.llm_api_key},
+                {"model_name": "qwen2-72b-instruct", "temperature": 0.3, "api_key": os.getenv('DASHSCOPE_API_KEY_BACKUP')}
+            ]
+        }
+        
+        configs = retry_configs[error_type]
+        config = configs[min(attempt, len(configs) - 1)]
+        
+        return Tongyi(
+            model_name=config["model_name"],
+            temperature=config.get("temperature", 0.7),
+            top_k=100,
+            top_p=0.9,
+            dashscope_api_key=config.get("api_key", self.llm_api_key)
+        )
+
     async def batch_async_call_llm(self, batch_inputs: list, output_parser_type="str"):
         tasks = []
         total_tasks = len(batch_inputs)
