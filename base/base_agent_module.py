@@ -25,23 +25,25 @@ class BaseAgentModule(ABC):
     async def process(self, input_data: dict):
         pass
     
-    async def async_call_llm(self, prompt_template, invoke_input: dict, llm_name="qwen-turbo", parse_json=False, **kwargs):
+    async def async_call_llm(self, prompt_template, invoke_input: dict, llm_name="qwen-turbo", output_parser_type="str", **kwargs):
         llm = Tongyi(model_name=llm_name, temperature=0.7, top_k=100, top_p=0.9, dashscope_api_key=self.llm_api_key)
         prompt_text = self.generate_prompt_text(prompt_template, **kwargs)
         prompt = PromptTemplate(template=prompt_text, input_variables=invoke_input.keys())
-        output_parser = StrOutputParser()
+        
+        # 根据参数选择输出解析器
+        if output_parser_type == "json":
+            output_parser = JsonOutputParser()
+        else:
+            output_parser = StrOutputParser()
+        
         chain = prompt | llm | output_parser
         try:
             response = await chain.ainvoke(invoke_input)
             logging.info(f"Response: {response}")
-            if parse_json:
-                return self.parse_json_response(response)
             return response
         except RateLimitError:
             logging.error("Rate limit reached, retrying...")
             response = await self.retry_chain(chain, kwargs)
-            if parse_json:
-                return self.parse_json_response(response)
             return response
         except Exception as e:
             logging.error(f"Unexpected error occurred: {e}")
@@ -61,7 +63,7 @@ class BaseAgentModule(ABC):
             logging.error(f"Retry failed: {e}")
             raise e
     
-    async def batch_async_call_llm(self, batch_inputs: list, parse_json=False):
+    async def batch_async_call_llm(self, batch_inputs: list, output_parser_type="str"):
         tasks = []
         total_tasks = len(batch_inputs)
         
@@ -72,7 +74,7 @@ class BaseAgentModule(ABC):
             batch_name = input_data.get('batch_name', f'unnamed_batch_{index}')
             
             self.logger.info(f"创建任务: {batch_name} ({index}/{total_tasks})")
-            task = asyncio.create_task(self._process_single_task(batch_name, prompt_template, invoke_input, kwargs, index, total_tasks, parse_json))
+            task = asyncio.create_task(self._process_single_task(batch_name, prompt_template, invoke_input, kwargs, index, total_tasks, output_parser_type))
             tasks.append(task)
 
         self.logger.info(f"开始并发处理 {total_tasks} 个任务")
@@ -81,10 +83,10 @@ class BaseAgentModule(ABC):
         
         return dict(results)
 
-    async def _process_single_task(self, batch_name, prompt_template, invoke_input, kwargs, index, total_tasks, parse_json):
+    async def _process_single_task(self, batch_name, prompt_template, invoke_input, kwargs, index, total_tasks, output_parser_type):
         self.logger.info(f"处理中: {batch_name} ({index}/{total_tasks})")
         try:
-            result = await self.async_call_llm(prompt_template, invoke_input, parse_json=parse_json, **kwargs)
+            result = await self.async_call_llm(prompt_template, invoke_input, output_parser_type=output_parser_type, **kwargs)
             self.logger.info(f"完成: {batch_name} ({index}/{total_tasks})")
             return batch_name, result
         except Exception as e:

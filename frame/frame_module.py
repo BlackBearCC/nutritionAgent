@@ -24,7 +24,11 @@ class FrameModule(BaseAgentModule):
             "user_info": user_info,
             "food_database": self.get_food_database()
         }
-        ingredient_result = await self.async_call_llm(frame_prompt.ingredient_generation_prompt, ingredient_input, parse_json=True)
+        ingredient_result = await self.async_call_llm(
+            frame_prompt.ingredient_generation_prompt, 
+            ingredient_input, 
+            output_parser_type="json"
+        )
         
         try:
             ingredient_result = json.loads(ingredient_result) if isinstance(ingredient_result, str) else ingredient_result
@@ -57,7 +61,7 @@ class FrameModule(BaseAgentModule):
                     }
                 })
 
-        results = await self.batch_async_call_llm(batch_inputs, parse_json=True)
+        results = await self.batch_async_call_llm(batch_inputs, output_parser_type="json")
         
         logging.info(f"批处理结果: {results}")  # 保留这行日志
         
@@ -168,7 +172,7 @@ class FrameModule(BaseAgentModule):
                 frame_prompt.replace_foods_prompt,
                 prompt_input,
                 llm_name="qwen-turbo",
-                parse_json=True
+                output_parser_type="json"
             )
             
             # 确保llm_result是字典类型

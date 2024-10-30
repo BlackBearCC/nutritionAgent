@@ -107,7 +107,7 @@ class MealPlanService:
                     # 批量调用LLM生成新的膳食计划
                     regenerated_meals = await self.frame_module.batch_async_call_llm(
                         batch_inputs, 
-                        parse_json=True
+                        output_parser_type="json"
                     )
 
                     # 更新膳食计划

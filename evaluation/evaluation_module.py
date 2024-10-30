@@ -24,13 +24,17 @@ class EvaluationModule(BaseAgentModule):
             prompt = follow_up_evaluation_prompt
         else:
             prompt = weekly_meal_evaluation_prompt
-        # evaluation_result = await self.async_call_llm(prompt, evaluation_input,llm_name="qwen2-72b-instruct")
-        evaluation_result = await self.async_call_llm(prompt, evaluation_input,llm_name="qwen-turbo")
+
+        evaluation_result = await self.async_call_llm(
+            prompt, 
+            evaluation_input,
+            llm_name="qwen-turbo",
+            output_parser_type="json"
+        )
         
-        try:
-            evaluation = json.loads(evaluation_result)
-            logging.info("成功完成食谱评估")
-            return evaluation
-        except json.JSONDecodeError:
-            logging.error("生成的评估结果不是有效的JSON格式")
+        if evaluation_result is None:
+            logging.error("生成的评估结果为空")
             return None
+        
+        logging.info("成功完成食谱评估")
+        return evaluation_result
