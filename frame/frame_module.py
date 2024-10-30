@@ -92,6 +92,9 @@ class FrameModule(BaseAgentModule):
 
             logging.info("完成7天21餐食谱框架生成")
             
+            # 确保食谱完整性
+            weekly_meal_plan = self._ensure_complete_meal_plan(weekly_meal_plan)
+            
             # 移除 prompt_template，以便日志记录
             batch_inputs_for_log = [{k: v for k, v in input_data.items() if k != 'prompt_template'} for input_data in batch_inputs]
             
@@ -291,3 +294,98 @@ class FrameModule(BaseAgentModule):
         
     def _get_default_ingredients(self) -> dict:
         return DefaultMealLibrary.get_default_ingredients()
+
+    def _validate_weekly_meal_plan(self, weekly_meal_plan: list) -> bool:
+        """验证7天21餐的完整性"""
+        try:
+            if not weekly_meal_plan or len(weekly_meal_plan) != 21:
+                return False
+                
+            # 用于检查每天每餐是否都存在
+            meal_check = {
+                day: {meal: False for meal in ['早餐', '午餐', '晚餐']}
+                for day in range(1, 8)
+            }
+            
+            for meal in weekly_meal_plan:
+                if not isinstance(meal, dict):
+                    return False
+                    
+                # 检查必要字段
+                if 'day' not in meal or 'meal' not in meal or 'menu' not in meal:
+                    return False
+                    
+                day = meal['day']
+                meal_type = meal['meal']
+                
+                # 检查day和meal的有效性
+                if not isinstance(day, int) or day < 1 or day > 7:
+                    return False
+                if meal_type not in ['早餐', '午餐', '晚餐']:
+                    return False
+                    
+                # 标记该餐已存在
+                meal_check[day][meal_type] = True
+                
+                # 检查menu结构
+                menu = meal['menu']
+                if not isinstance(menu, dict) or 'dishes' not in menu:
+                    return False
+                    
+                # 检查dishes非空
+                if not menu['dishes'] or not isinstance(menu['dishes'], list):
+                    return False
+            
+            # 确保所有餐次都存在
+            for day in range(1, 8):
+                for meal_type in ['早餐', '午餐', '晚餐']:
+                    if not meal_check[day][meal_type]:
+                        return False
+                        
+            return True
+            
+        except Exception as e:
+            logging.error(f"验证食谱结构时发生错误: {str(e)}")
+            return False
+
+    def _ensure_complete_meal_plan(self, weekly_meal_plan: list) -> list:
+        """确保返回完整的7天21餐"""
+        try:
+            if self._validate_weekly_meal_plan(weekly_meal_plan):
+                return weekly_meal_plan
+                
+            # 创建完整的食谱结构
+            complete_plan = []
+            meal_check = {
+                day: {meal: False for meal in ['早餐', '午餐', '晚餐']}
+                for day in range(1, 8)
+            }
+            
+            # 标记已存在的餐次
+            for meal in weekly_meal_plan:
+                if isinstance(meal, dict) and 'day' in meal and 'meal' in meal:
+                    day = meal['day']
+                    meal_type = meal['meal']
+                    if isinstance(day, int) and 1 <= day <= 7 and meal_type in ['早餐', '午餐', '晚餐']:
+                        meal_check[day][meal_type] = True
+                        complete_plan.append(meal)
+            
+            # 补充缺失的餐次
+            for day in range(1, 8):
+                for meal_type in ['早餐', '午餐', '晚餐']:
+                    if not meal_check[day][meal_type]:
+                        complete_plan.append(self._get_default_meal_plan(day, meal_type))
+            
+            # 确保顺序正确
+            complete_plan.sort(key=lambda x: (x['day'], ['早餐', '午餐', '晚餐'].index(x['meal'])))
+            
+            return complete_plan
+            
+        except Exception as e:
+            logging.error(f"补充完整食谱时发生错误: {str(e)}")
+            # 如果出错，返回完全默认的食谱
+            default_plan = []
+            for day in range(1, 8):
+                for meal in ['早餐', '午餐', '晚餐']:
+                    default_plan.append(self._get_default_meal_plan(day, meal))
+            return default_plan
