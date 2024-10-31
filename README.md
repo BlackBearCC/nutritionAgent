@@ -4,23 +4,41 @@
 
 ## 🌟 系统架构
 
-A[FastAPI Web服务] --> B[分析模块/AnalysisModule]
-A --> C[框架模块/FrameModule]
-A --> D[评估模块/EvaluationModule]
-B --> E[LLM服务]
+A[FastAPI Web服务](#fastapi-web服务) --> B[分析模块/AnalysisModule](#分析模块)
+A --> C[框架模块/FrameModule](#框架模块)
+A --> D[评估模块/EvaluationModule](#评估模块)
+B --> E[LLM服务](#llm服务)
 C --> E
 D --> E
-C --> F[默认食谱库]
+C --> F[默认食谱库](#默认食谱库)
 
-## 🚀 主要特性
+## 🚀 主要功能
 
-- 支持异步处理大规模请求
-- 基于用户画像的个性化推荐
-- 批处理7天21餐食谱定制任务
-- 分级错误重试机制及自定义兜底食材菜品库
-- 食材替换
-- 健康报告PDF分析
-- 完整的错误处理和日志系统
+### 1. 7天21餐食谱定制
+- 基于用户健康状况和饮食偏好生成个性化食谱
+- 支持批量生成7天21餐完整食谱
+- 包含菜品名称、食材配比、营养价值说明
+- 自动计算每餐热量，确保营养均衡
+
+### 2. 食材替换
+- 支持对指定餐次的菜品进行智能替换
+- 保持原有营养结构和热量均衡
+- 考虑用户饮食禁忌和偏好
+- 维持替换前后的定制化ID
+
+### 3. 健康报告PDF分析
+- 支持上传体检报告PDF/图片/文档
+- 智能识别关键健康指标
+- 生成健康建议摘要
+- 自动提交分析结果到指定接口
+
+## ⭐ 系统特性
+
+- **异步处理**: 支持并发处理多个食谱定制请求
+- **错误处理**: 分级重试机制，确保服务稳定性
+- **兜底方案**: 自定义食材菜品库，保障服务可用性
+- **日志系统**: 完整的请求响应和错误日志记录
+- **接口集成**: 支持配置回调接口，自动推送处理结果
 
 
 ## 🔄 主要流程
@@ -73,6 +91,49 @@ C --> F[默认食谱库]
    - 检查食材多样性
    - 验证与用户需求匹配度
    - 必要时进行菜品重新生成
+
+   ```python
+   # 评估和优化食谱
+   evaluation_input = {
+       'analysis_result': analysis_result,
+       'user_info': user_info,
+       'weekly_meal_plan': weekly_meal_plan,
+       'evaluation_history': evaluation_history
+   }
+   
+   evaluation_result = await self.evaluation_module.process(evaluation_input)
+   
+   if evaluation_result.get('need_regenerate'):
+       # 获取需要重新生成的餐次
+       meals_to_regenerate = evaluation_result.get('meals_to_regenerate', [])
+       
+       for meal_info in meals_to_regenerate:
+           day = meal_info['day']
+           meal = meal_info['meal']
+           
+           # 重新生成指定餐次
+           specific_meal = {
+               'day': day,
+               'meal': meal,
+               'reason': meal_info['reason']
+           }
+           
+           new_meal = await self.regenerate_specific_meal(
+               analysis_result,
+               user_info,
+               specific_meal,
+               weekly_meal_plan
+           )
+           
+           if new_meal:
+               # 更新食谱计划
+               weekly_meal_plan = self._update_meal_plan(
+                   weekly_meal_plan,
+                   day,
+                   meal,
+                   new_meal
+               )
+   ```
 
    e. **兜底保障机制**
    - 默认食谱库作为备选方案
@@ -191,37 +252,36 @@ services:
 ### 方式一：本地环境启动
 
 1. **环境准备**
-bash
-创建虚拟环境
+```bash
+# 创建虚拟环境
 python -m venv venv
-激活虚拟环境
-Windows
+# 激活虚拟环境
+# Windows
 venv\Scripts\activate
-Linux/Mac
+# Linux/Mac
 source venv/bin/activate
-安装依赖
+# 安装依赖
 pip install -r requirements.txt
-bash
-复制环境变量模板
+# 复制环境变量模板
 cp .env.example .env
-修改.env文件，填入必要的配置
+# 修改.env文件，填入必要的配置
 vim .env
-bash
-使用uvicorn启动
+# 使用uvicorn启动
 python app/main.py
+```
 
 ### 方式二：Docker Compose启动
 
 1. **开发环境**
-bash
-启动开发环境
+```bash
+# 启动开发环境
 docker-compose up nutrition-agent-dev
-服务将在 http://localhost:8000 启动
+# 服务将在 http://localhost:8000 启动
 2. **测试环境**
-bash
-启动测试环境
+# 启动测试环境
 docker-compose up nutrition-agent-test
-服务将在 http://localhost:8088 启动
+# 服务将在 http://localhost:8088 启动
+```
 
 ### 环境要求
 
