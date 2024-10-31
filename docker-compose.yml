@@ -30,3 +30,18 @@ services:
       - PDF_ANALYSIS_SUBMIT_URL=http://172.16.10.148:9050/food/view/intellectual-proxy/receivePdfResult
       - MEAL_PLAN_SUBMIT_URL=http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedResult
       - MEAL_PLAN_REPLACE_URL=http://172.16.10.148:9050/food/view/intellectual-proxy/receiveFoodCustomizedReplace
+
+  nutrition-agent-prod:
+    image: registry.cn-hangzhou.aliyuncs.com/big-head/nutrition-agent:latest
+    container_name: nutrition-agent-prod
+    ports:
+      - "8089:8000"
+    volumes:
+      - ./.env:/app/.env
+    env_file:
+      - .env
+    environment:
+      - ENV=prod
+      - PDF_ANALYSIS_SUBMIT_URL=http://172.16.0.100:9050/food/view/intellectual-proxy/receivePdfResult
+      - MEAL_PLAN_SUBMIT_URL=http://172.16.0.100:9050/food/view/intellectual-proxy/receiveFoodCustomizedResult
+      - MEAL_PLAN_REPLACE_URL=http://172.16.0.100:9050/food/view/intellectual-proxy/receiveFoodCustomizedReplace
