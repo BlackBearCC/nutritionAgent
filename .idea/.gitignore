@@ -6,3 +6,23 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE configuration
+.idea/
+.vscode/
+
+# Logging files
+*.log
+app/*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/

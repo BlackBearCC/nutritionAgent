@@ -264,7 +264,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 # 复制环境变量模板
 cp .env.example .env
-# 修改.env文件，填入必要的配置
+# 修改.env文件填入必要的配置
 vim .env
 # 使用uvicorn启动
 python app/main.py
@@ -293,3 +293,22 @@ docker-compose up nutrition-agent-test
 ### 配置文件说明
 
 1. **.env 文件**
+```
+
+## 🔐 环境配置
+
+1. **复制环境变量模板**
+```bash
+cp .env.example .env
+```
+
+2. **修改 .env 文件**
+- 填入你的 API Keys
+- 配置正确的回调接口地址
+- 设置合适的日志路径
+
+3. **注意事项**
+- ⚠️ 永远不要将包含真实 API Keys 的 .env 文件提交到代码仓库
+- 🔒 确保 .env 文件已经添加到 .gitignore
+- 💡 团队成员之间通过安全渠道共享环境变量
+- 🔄 不同环境(开发/测试/生产)使用不同的 .env 文件

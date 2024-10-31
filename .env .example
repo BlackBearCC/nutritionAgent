@@ -1,0 +1,14 @@
+# LLM Service Configuration
+MOONSHOT_API_KEY=your_moonshot_api_key_here
+MOONSHOT_BASE_URL=https://api.moonshot.cn/v1
+DASHSCOPE_API_KEY=your_dashscope_api_key_here
+DASHSCOPE_API_KEY_BACKUP=your_dashscope_backup_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Logging Configuration
+LOG_PATH=app/app.log
+
+# API Endpoints (Development)
+PDF_ANALYSIS_SUBMIT_URL=http://your-dev-api/receivePdfResult
+MEAL_PLAN_SUBMIT_URL=http://your-dev-api/receiveFoodCustomizedResult 
+MEAL_PLAN_REPLACE_URL=http://your-dev-api/receiveFoodCustomizedReplace
