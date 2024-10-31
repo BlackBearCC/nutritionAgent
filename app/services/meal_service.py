@@ -186,7 +186,8 @@ class MealPlanService:
     def _process_meal(self, meal_data: dict) -> Meal:
         """处理单个餐食数据"""
         try:
-            total_calories = meal_data['menu']['total_calories']
+            # 处理总热量，设置默认值为0
+            total_calories = meal_data.get('menu', {}).get('total_calories', 180)
             total_energy = (
                 int(total_calories.replace('Kcal', '').replace('kcal', '').strip())
                 if isinstance(total_calories, str)
@@ -199,7 +200,7 @@ class MealPlanService:
                 FoodDetail(
                     foodDetail=dish.get('detail', []),
                     foodName=dish['name'],
-                    foodCount=dish['quantity'],
+                    foodCount=dish.get('quantity', '1份'),  # 默认份量
                     foodDesc=dish['introduction'],
                     foodEnergy = dish['energy'],
                     customizedId=dish.get('customizedId')

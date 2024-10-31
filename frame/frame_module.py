@@ -177,7 +177,7 @@ class FrameModule(BaseAgentModule):
             llm_result = await self.async_call_llm(
                 frame_prompt.replace_foods_prompt,
                 prompt_input,
-                llm_name="qwen-turbo",
+                llm_name="qwen2-72b-instruct",
                 output_parser_type="json"
             )
             
@@ -362,19 +362,42 @@ class FrameModule(BaseAgentModule):
                 for day in range(1, 8)
             }
             
+            # 用于检测重复的餐次
+            meal_count = {}
+            
             # 标记已存在的餐次
             for meal in weekly_meal_plan:
                 if isinstance(meal, dict) and 'day' in meal and 'meal' in meal:
                     day = meal['day']
                     meal_type = meal['meal']
+                    meal_key = f"{day}_{meal_type}"
+                    
                     if isinstance(day, int) and 1 <= day <= 7 and meal_type in ['早餐', '午餐', '晚餐']:
+                        # 验证菜品数据完整性
+                        if not self._validate_meal_data(meal):
+                            logging.warning(f"跳过无效的餐食数据: 第{day}天 {meal_type}")
+                            continue
+                        
+                        # 检查是否已经存在该餐次
+                        if meal_check[day][meal_type]:
+                            logging.warning(f"检测到重复的餐次: 第{day}天 {meal_type}, 将跳过")
+                            meal_count[meal_key] = meal_count.get(meal_key, 0) + 1
+                            continue
+                        
                         meal_check[day][meal_type] = True
                         complete_plan.append(meal)
+                        meal_count[meal_key] = 1
+            
+            # 记录重复餐次的统计信息
+            duplicates = {k: v for k, v in meal_count.items() if v > 1}
+            if duplicates:
+                logging.info(f"重复餐次统计: {duplicates}")
             
             # 补充缺失的餐次
             for day in range(1, 8):
                 for meal_type in ['早餐', '午餐', '晚餐']:
                     if not meal_check[day][meal_type]:
+                        logging.info(f"补充缺失的餐次: 第{day}天 {meal_type}")
                         complete_plan.append(self._get_default_meal_plan(day, meal_type))
             
             # 确保顺序正确
@@ -390,6 +413,49 @@ class FrameModule(BaseAgentModule):
                 for meal in ['早餐', '午餐', '晚餐']:
                     default_plan.append(self._get_default_meal_plan(day, meal))
             return default_plan
+
+    def _validate_meal_data(self, meal: dict) -> bool:
+        """验证单个餐食数据的完整性"""
+        try:
+            if not isinstance(meal, dict):
+                return False
+                
+            # 验证基本结构
+            if 'menu' not in meal or not isinstance(meal['menu'], dict):
+                return False
+                
+            menu = meal['menu']
+            if 'dishes' not in menu or not isinstance(menu['dishes'], list):
+                return False
+                
+            # 验证每个菜品的完整性
+            for dish in menu['dishes']:
+                if not isinstance(dish, dict):
+                    return False
+                    
+                # 检查必需字段
+                required_fields = ['name', 'quantity', 'energy', 'introduction', 'detail']
+                if not all(field in dish for field in required_fields):
+                    logging.warning(f"菜品缺少必需字段: {dish.get('name', 'unknown')}")
+                    return False
+                    
+                # 验证字段类型
+                if not isinstance(dish['name'], str) or not dish['name']:
+                    return False
+                if not isinstance(dish['quantity'], str) or not dish['quantity']:
+                    return False
+                if not isinstance(dish['energy'], (int, float)):
+                    return False
+                if not isinstance(dish['introduction'], str) or not dish['introduction']:
+                    return False
+                if not isinstance(dish['detail'], list):
+                    return False
+                    
+            return True
+                
+        except Exception as e:
+            logging.error(f"验证餐食数据时发生错误: {str(e)}")
+            return False
 
     def _generate_random_energy(self, meal_type: str, food_type: str = None) -> int:
         """生成合理范围内的随机能量值"""
