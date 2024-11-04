@@ -159,6 +159,7 @@ class MealPlanService:
                 code=0,
                 msg="成功",
                 data=GenerateMealPlanData(
+                    traceId=request.traceId,
                     userId=str(request.userId),
                     foodDate=request.customizedDate,
                     record=daily_records

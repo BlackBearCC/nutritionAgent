@@ -20,6 +20,7 @@ class DayMeal(BaseModel):
     meals: List[Meal]
 
 class MealPlanRequest(BaseModel):
+    traceId:str #全链路id，排错专用
     userId: str
     customizedDate: str
     CC: Optional[List[str]] = []
@@ -66,6 +67,7 @@ class ReplaceMealPlanResponse(BaseModel):
     data: ReplaceMealPlanData
 
 class GenerateMealPlanData(BaseModel):
+    traceId:str
     userId: str
     foodDate: str
     record: List[DayMeal]

@@ -54,6 +54,7 @@ def generate_default_meal_plan(request: MealPlanRequest) -> GenerateMealPlanResp
         code=0,
         msg="成功",
         data=GenerateMealPlanData(
+            traceId=str(request.traceId),
             userId=str(request.userId),
             foodDate=request.customizedDate or datetime.now().strftime("%Y-%m-%d"),
             record=daily_records
